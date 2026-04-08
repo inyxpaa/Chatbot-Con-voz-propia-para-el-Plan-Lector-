@@ -16,8 +16,8 @@ __pycache__/
 .DS_Store
 
 ### Frontend
-web/node_modules/
-web/.vite/
+frontend/node_modules/
+frontend/.vite/
 
 static/*
 !static/.gitkeep
