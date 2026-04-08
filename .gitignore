@@ -1,0 +1,9 @@
+web/node_modules/
+web/.vite/
+
+static/*
+!static/.gitkeep
+
+*.log
+.DS_Store
+
