@@ -19,7 +19,7 @@ __pycache__/
 frontend/node_modules/
 frontend/.vite/
 
-static/*
-!static/.gitkeep
+backend/static/*
+!backend/static/.gitkeep
 
 *.log
