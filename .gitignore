@@ -1,0 +1,25 @@
+### Backend / Python
+venv/
+env/
+__pycache__/
+*.py[cod]
+*$py.class
+
+*.db
+*.sqlite3
+
+.env
+
+### Editor
+.vscode/
+.idea/
+.DS_Store
+
+### Frontend
+frontend/node_modules/
+frontend/.vite/
+
+backend/static/*
+!backend/static/.gitkeep
+
+*.log
