@@ -1,0 +1,19 @@
+# Entorno virtual (No se sube porque cada uno crea el suyo)
+venv/
+env/
+
+# Base de Datos local (No se sube por privacidad y minimización de datos)
+*.db
+*.sqlite3
+
+# Archivos temporales de Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Configuración de VS Code u otros editores
+.vscode/
+.idea/
+
+# Archivos de variables de entorno (Seguridad: Issue #35)
+.env
