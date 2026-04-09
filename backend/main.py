@@ -31,7 +31,7 @@ def get_db():
 
 def get_chroma_paths() -> tuple[str, str]:
     base_dir = Path(__file__).resolve().parent.parent
-    default_db = base_dir / "creacion datalake" / "datalake" / "artifacts" / "chroma_db"
+    default_db = base_dir / "backend" / "datalake" / "datalake" / "artifacts" / "chroma_db"
     db_path = os.getenv("CHROMA_DB_PATH", str(default_db))
     collection_name = os.getenv("CHROMA_COLLECTION", "quijote")
     return db_path, collection_name
