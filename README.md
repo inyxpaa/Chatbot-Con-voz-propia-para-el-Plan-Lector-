@@ -1,43 +1,34 @@
 # Chatbot "Con voz propia" - Plan Lector
 
-Asistente conversacional con tecnología RAG (Retrieval-Augmented Generation) diseñado para el Plan Lector del centro educativo.
+Proyecto con frontend (React/Vite) y backend (FastAPI + ChromaDB) para consultas tipo chatbot.
 
-## Descripción del Proyecto
+## Estructura
 
-El objetivo es difundir, consultar y dinamizar los contenidos del proyecto lector mediante una interfaz web publicable. El sistema permite responder preguntas, recuperar contenido y ofrecer recomendaciones lectoras basándose exclusivamente en una base documental curada.
+- `frontend/`: interfaz web.
+- `backend/`: API y persistencia local.
+- `creacion datalake/`: datos y artefactos de recuperación.
+- `scripts/`: scripts de instalación y arranque.
 
-## Arquitectura
+## Inicio rápido (Windows / PowerShell)
 
-El proyecto se divide en diferentes capas de procesamiento:
+Desde la raíz del repo:
 
-* **Fuentes Documentales (raw):** Almacenamiento de textos originales, reseñas y materiales didácticos.
-* **Ingesta y Preparación (processed):** Scripts de limpieza, extracción de texto y segmentación (chunking).
-* **Indexación Vectorial (artifacts):** Generación de embeddings y almacenamiento en base de datos vectorial ChromaDB.
+```powershell
+.\scripts\instalar.ps1
+.\scripts\lanzar-todo.ps1
+```
 
-## Estructura del Repositorio
+Esto abre dos ventanas:
+- Backend en `http://127.0.0.1:8000`
+- Frontend en `http://localhost:5173`
 
-- `creacion datalake/`: Scripts de preparación de datos y generación de embeddings.
-- `backend/`: API desarrollada con FastAPI para gestionar las consultas.
-- `frontend/`: Interfaz de usuario desarrollada con React/Vite.
+## Arranque por separado
 
-## Tecnologías Utilizadas
+```powershell
+.\scripts\lanzar-backend.ps1
+.\scripts\lanzar-frontend.ps1
+```
 
-* **Lenguaje:** Python, JavaScript
-* **Backend:** FastAPI
-* **Base de Datos Vectorial:** ChromaDB
-* **Embeddings:** Sentence-Transformers
-* **Frontend:** React, Vite, HTML, CSS
+## Swagger de la API
 
-## Instalación y Ejecución (Entorno Local)
-
-1. Clonar el repositorio.
-2. Navegar a la carpeta del proyecto.
-3. Crear un entorno virtual.
-4. Instalar las dependencias.
-
-```bash
-git clone [https://github.com/inyxpaa/Chatbot-Con-voz-propia-para-el-Plan-Lector-.git](https://github.com/inyxpaa/Chatbot-Con-voz-propia-para-el-Plan-Lector-.git)
-cd Chatbot-Con-voz-propia-para-el-Plan-Lector-
-python -m venv .venv
-.venv\Scripts\activate
-pip install -r backend/requirements.txt
+- `http://127.0.0.1:8000/docs`
