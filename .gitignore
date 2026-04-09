@@ -1,0 +1,28 @@
+# Entorno virtual de Python
+venv/
+.venv/
+env/
+# Texto de libros
+*.txt
+
+# Índice vectorial generado (se regenera con ingesta.py)
+data/db/
+
+# Caché de Python
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Variables de entorno
+.env
+
+# Modelos descargados por sentence-transformers (cache local)
+.cache/
+
+# IDEs
+.vscode/
+.idea/
+
+# Sistema operativo
+.DS_Store
+Thumbs.db
