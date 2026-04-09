@@ -6,16 +6,16 @@ Proyecto con frontend (React/Vite) y backend (FastAPI + ChromaDB) para consultas
 
 - `frontend/`: interfaz web.
 - `backend/`: API y persistencia local.
-- `creacion datalake/`: datos y artefactos de recuperación.
-- `scripts/`: scripts de instalación y arranque.
+- `backend/datalake/`: datos y artefactos de recuperación.
+- `backend/scripts/`: scripts de instalación y arranque.
 
 ## Inicio rápido (Windows / PowerShell)
 
 Desde la raíz del repo:
 
 ```powershell
-.\scripts\instalar.ps1
-.\scripts\lanzar-todo.ps1
+.\backend\scripts\instalar.ps1
+.\backend\scripts\lanzar-todo.ps1
 ```
 
 Esto abre dos ventanas:
@@ -25,8 +25,8 @@ Esto abre dos ventanas:
 ## Arranque por separado
 
 ```powershell
-.\scripts\lanzar-backend.ps1
-.\scripts\lanzar-frontend.ps1
+.\backend\scripts\lanzar-backend.ps1
+.\backend\scripts\lanzar-frontend.ps1
 ```
 
 ## Swagger de la API
