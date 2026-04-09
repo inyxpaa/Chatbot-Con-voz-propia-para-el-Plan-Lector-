@@ -1,28 +1,30 @@
-# Entorno virtual de Python
+### Backend / Python
 venv/
-.venv/
 env/
-# Texto de libros
-*.txt
-
-# Índice vectorial generado (se regenera con ingesta.py)
-data/db/
-
-# Caché de Python
 __pycache__/
 *.py[cod]
-*.pyo
+*$py.class
 
-# Variables de entorno
+*.db
+*.sqlite3
+
 .env
 
-# Modelos descargados por sentence-transformers (cache local)
-.cache/
-
-# IDEs
+### Editor
 .vscode/
 .idea/
-
-# Sistema operativo
 .DS_Store
-Thumbs.db
+
+### Carpetas no usadas (por ahora)
+data/
+docs/
+logs/
+
+### Frontend
+frontend/node_modules/
+frontend/.vite/
+
+backend/static/*
+!backend/static/.gitkeep
+
+*.log
