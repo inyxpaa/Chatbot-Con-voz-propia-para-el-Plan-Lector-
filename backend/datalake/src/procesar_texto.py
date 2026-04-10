@@ -1,6 +1,6 @@
 from pathlib import Path
 
-base_dir = Path("datalake")
+base_dir = Path(__file__).resolve().parent.parent / "datalake"
 raw_dir = base_dir / "raw"
 processed_dir = base_dir / "processed"
 artifacts_dir = base_dir / "artifacts"

@@ -36,7 +36,22 @@ if ($pythonPath -eq "") {
     exit
 } else {
     Write-Host "Python detectado. Verificando librerias requeridas..." -ForegroundColor Green
-    & $pythonPath -m pip install -r $BackendReqs
+    & $pythonPath -m pip install -r $BackendReqs -q
+}
+
+# 1.5 Crear base de datos vectorial si no existe
+$DbPath = Join-Path $ProjectRoot "backend\datalake\datalake\artifacts\chroma_db"
+if (-not (Test-Path $DbPath)) {
+    Write-Host "`n[+] Base de datos (chroma_db) no encontrada. Construyendo base de datos desde los raw data..." -ForegroundColor Yellow
+    $ProcesarScript = Join-Path $ProjectRoot "backend\datalake\src\procesar_texto.py"
+    $VectorScript = Join-Path $ProjectRoot "backend\datalake\src\crear_vectores.py"
+    Write-Host "  -> Procesando el Quijote..." -ForegroundColor Cyan
+    & $pythonPath $ProcesarScript
+    Write-Host "  -> Creando Embeddings en ChromaDB (esto puede tardar unos minutos la primera vez)..." -ForegroundColor Cyan
+    & $pythonPath $VectorScript
+    Write-Host "Base de datos creada exitosamente." -ForegroundColor Green
+} else {
+    Write-Host "`n[+] Base de datos vectorial ya existe, saltando construccion." -ForegroundColor Green
 }
 
 # 2. Instalar dependencias Frontend
