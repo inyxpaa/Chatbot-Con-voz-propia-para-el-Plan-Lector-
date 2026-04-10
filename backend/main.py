@@ -73,7 +73,10 @@ async def chat_endpoint(query: ChatQuery, db: Session = Depends(get_db)) -> Chat
     try:
         docs, fuentes = recuperar_contexto(pregunta)
         respuesta = generar_respuesta(pregunta, docs)
-    except Exception:
+    except Exception as e:
+        import traceback
+        print("ERROR EN RECUPERAR_CONTEXTO:", e)
+        traceback.print_exc()
         respuesta = "Ahora mismo no puedo consultar el índice de contexto. Inténtalo de nuevo."
         fuentes = []
 
