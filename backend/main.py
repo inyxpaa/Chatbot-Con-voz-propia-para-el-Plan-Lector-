@@ -1,4 +1,5 @@
 import os
+import sys
 from pathlib import Path
 
 import chromadb
@@ -6,6 +7,13 @@ from fastapi import FastAPI, Depends
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from .database import SessionLocal, create_tables, Interaction
+
+# ── Filtro de contenido (insultos, racismo, odio) ─────────────────
+# Añade modelo/ al path para poder importar filtro.py directamente
+_MODELO_DIR = Path(__file__).resolve().parent / "modelo"
+if str(_MODELO_DIR) not in sys.path:
+    sys.path.insert(0, str(_MODELO_DIR))
+from filtro import verificar_consulta  # noqa: E402
 
 create_tables()
 
@@ -70,6 +78,21 @@ async def chat_endpoint(query: ChatQuery, db: Session = Depends(get_db)) -> Chat
     if not pregunta:
         return ChatResponse(respuesta="Escribe una consulta para poder ayudarte.", fuentes=[])
 
+    # ── 1. Filtro de contenido inapropiado ───────────────────────────
+    verificacion = verificar_consulta(pregunta)
+    if not verificacion["aceptado"]:
+        # Guardamos el intento en BD igualmente (para auditoría)
+        new_log = Interaction(
+            session_id=query.session_id,
+            question=pregunta,
+            answer=f"[BLOQUEADO:{verificacion['categoria']}] {verificacion['mensaje']}"
+        )
+        db.add(new_log)
+        db.commit()
+        return ChatResponse(respuesta=verificacion["mensaje"], fuentes=[])
+    # ─────────────────────────────────────────────────────────────────
+
+    # ── 2. Recuperar contexto del índice vectorial ───────────────────
     try:
         docs, fuentes = recuperar_contexto(pregunta)
         respuesta = generar_respuesta(pregunta, docs)
@@ -80,6 +103,7 @@ async def chat_endpoint(query: ChatQuery, db: Session = Depends(get_db)) -> Chat
         respuesta = "Ahora mismo no puedo consultar el índice de contexto. Inténtalo de nuevo."
         fuentes = []
 
+    # ── 3. Registrar en BD y devolver ────────────────────────────────
     new_log = Interaction(session_id=query.session_id, question=pregunta, answer=respuesta)
     db.add(new_log)
     db.commit()
