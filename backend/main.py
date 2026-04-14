@@ -1,5 +1,7 @@
 import os
 import sys
+import json
+import time
 import datetime
 from pathlib import Path
 
@@ -8,26 +10,25 @@ from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
-from database import SessionLocal, create_tables, Interaction
+from database import SessionLocal, create_tables, Busqueda
 
-# ── MongoDB (optional – logs rich chat history) ───────────────────────────
+# ── MongoDB (opcional — historial enriquecido) ─────────────────────────────
 try:
     from pymongo import MongoClient
     _MONGO_URL = os.getenv("MONGODB_URL", "")
     _mongo_client = MongoClient(_MONGO_URL, serverSelectionTimeoutMS=3000) if _MONGO_URL else None
     _mongo_db = _mongo_client["planLectorDB"] if _mongo_client else None
-    _chat_logs = _mongo_db["chat_logs"] if _mongo_db else None
+    _chat_logs = _mongo_db["consultas"] if _mongo_db else None
     if _mongo_client:
-        _mongo_client.admin.command("ping")  # verify connection
-        print("MongoDB connected.")
+        _mongo_client.admin.command("ping")
+        print("MongoDB conectado correctamente.")
     else:
-        print("MONGODB_URL not set — MongoDB logging disabled.")
+        print("MONGODB_URL no configurado — registro MongoDB desactivado.")
 except Exception as _mongo_err:
-    print(f"MongoDB connection failed (non-fatal): {_mongo_err}")
+    print(f"Conexión MongoDB fallida (no crítico): {_mongo_err}")
     _chat_logs = None
 
-# ── Filtro de contenido (insultos, racismo, odio) ─────────────────
-# Añade modelo/ al path para poder importar filtro.py directamente
+# ── Filtro de contenido inapropiado ───────────────────────────────────────
 _MODELO_DIR = Path(__file__).resolve().parent / "modelo"
 if str(_MODELO_DIR) not in sys.path:
     sys.path.insert(0, str(_MODELO_DIR))
@@ -35,7 +36,7 @@ from filtro import verificar_consulta  # noqa: E402
 
 create_tables()
 
-app = FastAPI(title="Chatbot 'Con voz propia' API")
+app = FastAPI(title="API del Chatbot 'Con voz propia' — Plan Lector")
 
 app.add_middleware(
     CORSMiddleware,
@@ -44,6 +45,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 
 class ChatQuery(BaseModel):
     mensaje: str
@@ -89,8 +91,34 @@ def generar_respuesta(pregunta: str, docs: list[str]) -> str:
         limpio = " ".join(doc.split())
         fragmentos.append(limpio[:320])
 
-    contexto = " ".join(fragmentos).strip()
-    return contexto
+    return " ".join(fragmentos).strip()
+
+
+def registrar_en_mongodb(
+    session_id: str | None,
+    pregunta: str,
+    respuesta: str,
+    fuentes: list[str],
+    bloqueada: bool,
+    categoria_bloqueo: str | None,
+    tiempo_ms: float,
+):
+    """Guarda la consulta completa en MongoDB como documento JSON."""
+    if _chat_logs is None:
+        return
+    try:
+        _chat_logs.insert_one({
+            "session_id":         session_id,
+            "pregunta":           pregunta,
+            "respuesta":          respuesta,
+            "fuentes":            fuentes,
+            "bloqueada":          bloqueada,
+            "categoria_bloqueo":  categoria_bloqueo,
+            "tiempo_respuesta_ms": tiempo_ms,
+            "fecha":              datetime.datetime.utcnow(),
+        })
+    except Exception as e:
+        print(f"Error al guardar en MongoDB (no crítico): {e}")
 
 
 @app.get("/")
@@ -100,25 +128,36 @@ def read_root():
 
 @app.post("/chat")
 async def chat_endpoint(query: ChatQuery, db: Session = Depends(get_db)) -> ChatResponse:
+    inicio = time.perf_counter()
     pregunta = query.mensaje.strip()
+
     if not pregunta:
         return ChatResponse(respuesta="Escribe una consulta para poder ayudarte.", fuentes=[])
 
-    # ── 1. Filtro de contenido inapropiado ───────────────────────────
+    # ── 1. Filtro de contenido ────────────────────────────────────────────
     verificacion = verificar_consulta(pregunta)
     if not verificacion["aceptado"]:
-        # Guardamos el intento en BD igualmente (para auditoría)
-        new_log = Interaction(
-            session_id=query.session_id,
-            question=pregunta,
-            answer=f"[BLOQUEADO:{verificacion['categoria']}] {verificacion['mensaje']}"
-        )
-        db.add(new_log)
-        db.commit()
-        return ChatResponse(respuesta=verificacion["mensaje"], fuentes=[])
-    # ─────────────────────────────────────────────────────────────────
+        tiempo_ms = (time.perf_counter() - inicio) * 1000
+        categoria = verificacion.get("categoria", "desconocido")
+        msg = verificacion["mensaje"]
 
-    # ── 2. Recuperar contexto del índice vectorial ───────────────────
+        # PostgreSQL
+        db.add(Busqueda(
+            session_id=query.session_id,
+            pregunta=pregunta,
+            respuesta=msg,
+            fuentes="[]",
+            bloqueada=True,
+            categoria_bloqueo=categoria,
+            tiempo_respuesta_ms=tiempo_ms,
+        ))
+        db.commit()
+
+        # MongoDB
+        registrar_en_mongodb(query.session_id, pregunta, msg, [], True, categoria, tiempo_ms)
+        return ChatResponse(respuesta=msg, fuentes=[])
+
+    # ── 2. Recuperar contexto vectorial (ChromaDB) ────────────────────────
     try:
         docs, fuentes = recuperar_contexto(pregunta)
         respuesta = generar_respuesta(pregunta, docs)
@@ -129,22 +168,20 @@ async def chat_endpoint(query: ChatQuery, db: Session = Depends(get_db)) -> Chat
         respuesta = "Ahora mismo no puedo consultar el índice de contexto. Inténtalo de nuevo."
         fuentes = []
 
-    # ── 3. Registrar en PostgreSQL ────────────────────────────────────
-    new_log = Interaction(session_id=query.session_id, question=pregunta, answer=respuesta)
-    db.add(new_log)
+    tiempo_ms = (time.perf_counter() - inicio) * 1000
+
+    # ── 3. Registrar en PostgreSQL (tabla busquedas) ──────────────────────
+    db.add(Busqueda(
+        session_id=query.session_id,
+        pregunta=pregunta,
+        respuesta=respuesta,
+        fuentes=json.dumps(fuentes),
+        bloqueada=False,
+        tiempo_respuesta_ms=tiempo_ms,
+    ))
     db.commit()
 
-    # ── 4. Registrar en MongoDB (historial rico) ──────────────────────
-    if _chat_logs is not None:
-        try:
-            _chat_logs.insert_one({
-                "session_id": query.session_id,
-                "question": pregunta,
-                "answer": respuesta,
-                "sources": fuentes,
-                "timestamp": datetime.datetime.utcnow(),
-            })
-        except Exception as mongo_err:
-            print(f"MongoDB log failed (non-fatal): {mongo_err}")
+    # ── 4. Registrar en MongoDB (historial enriquecido) ───────────────────
+    registrar_en_mongodb(query.session_id, pregunta, respuesta, fuentes, False, None, tiempo_ms)
 
     return ChatResponse(respuesta=respuesta, fuentes=fuentes)
