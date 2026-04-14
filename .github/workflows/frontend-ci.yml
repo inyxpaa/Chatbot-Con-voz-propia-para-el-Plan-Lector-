@@ -1,0 +1,47 @@
+name: Deploy Frontend to EC2
+
+on:
+  push:
+    branches: [ "main", "master", "dev" ]
+    paths:
+      - 'frontend/**'
+      - '.github/workflows/frontend-ci.yml'
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and Push Docker Image
+        uses: docker/build-push-action@v4
+        with:
+          context: ./frontend
+          push: true
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/plan-lector-frontend:latest
+          build-args: |
+            VITE_BACKEND_URL=http://${{ secrets.EC2_HOST_BACKEND }}:8000
+
+      - name: Deploy to EC2
+        uses: appleboy/ssh-action@v0.1.10
+        with:
+          host: ${{ secrets.EC2_HOST_FRONTEND }}
+          username: ${{ secrets.EC2_USERNAME }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            if ! command -v docker &> /dev/null; then
+              curl -fsSL https://get.docker.com -o get-docker.sh
+              sudo sh get-docker.sh
+              sudo usermod -aG docker ubuntu
+            fi
+            sudo docker pull ${{ secrets.DOCKERHUB_USERNAME }}/plan-lector-frontend:latest
+            sudo docker stop frontend-app || true
+            sudo docker rm frontend-app || true
+            sudo docker run -d --name frontend-app -p 80:80 ${{ secrets.DOCKERHUB_USERNAME }}/plan-lector-frontend:latest
