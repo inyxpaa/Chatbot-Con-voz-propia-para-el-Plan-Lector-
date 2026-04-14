@@ -3,3 +3,5 @@ uvicorn
 sqlalchemy
 pydantic
 chromadb
+requests
+beautifulsoup4
