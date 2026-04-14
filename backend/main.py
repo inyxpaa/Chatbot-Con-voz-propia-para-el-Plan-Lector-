@@ -3,6 +3,7 @@ from pathlib import Path
 
 import chromadb
 from fastapi import FastAPI, Depends
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from .database import SessionLocal, create_tables, Interaction
@@ -10,6 +11,14 @@ from .database import SessionLocal, create_tables, Interaction
 create_tables()
 
 app = FastAPI(title="Chatbot 'Con voz propia' API")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 class ChatQuery(BaseModel):
     mensaje: str
