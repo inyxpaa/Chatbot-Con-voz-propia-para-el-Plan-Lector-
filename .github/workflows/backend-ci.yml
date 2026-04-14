@@ -34,6 +34,11 @@ jobs:
           username: ${{ secrets.EC2_USERNAME }}
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
+            if ! command -v docker &> /dev/null; then
+              curl -fsSL https://get.docker.com -o get-docker.sh
+              sudo sh get-docker.sh
+              sudo usermod -aG docker ubuntu
+            fi
             sudo docker pull ${{ secrets.DOCKERHUB_USERNAME }}/plan-lector-backend:latest
             sudo docker stop backend-app || true
             sudo docker rm backend-app || true
