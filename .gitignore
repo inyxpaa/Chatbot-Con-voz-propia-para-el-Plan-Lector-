@@ -28,3 +28,5 @@ backend/static/*
 !backend/static/.gitkeep
 
 *.log
+
+backend/datalake/datalake/artifacts/chroma_db/

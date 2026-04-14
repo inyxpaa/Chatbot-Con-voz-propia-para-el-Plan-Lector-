@@ -3,11 +3,7 @@ from pathlib import Path
 import os
 import sys
 
-# Cambiamos el directorio de trabajo al del script para evitar bugs de ChromaDB con rutas absolutas que contienen Ñ/acentos.
-script_dir = os.path.dirname(os.path.abspath(__file__))
-os.chdir(script_dir)
-
-base_dir = Path("datalake")
+base_dir = Path(__file__).resolve().parent.parent / "datalake"
 processed_file = base_dir / "processed" / "quijote_chunks.txt"
 db_path = base_dir / "artifacts" / "chroma_db"
 
