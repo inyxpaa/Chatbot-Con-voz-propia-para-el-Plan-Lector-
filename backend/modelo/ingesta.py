@@ -28,7 +28,7 @@ import faiss
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # Data Lake RAW — misma ruta del repositorio (renombrada tras el pull)
-DATA_LAKE_DIR = os.path.join(BASE_DIR, "datalake", "datalake", "raw")
+DATA_LAKE_DIR = os.path.join(BASE_DIR, "datalake", "raw")
 
 # Salida del índice vectorial
 DB_DIR     = os.path.join(BASE_DIR, "data", "db")
