@@ -1,5 +1,6 @@
 import os
 import sys
+import datetime
 from pathlib import Path
 
 import chromadb
@@ -8,6 +9,22 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from database import SessionLocal, create_tables, Interaction
+
+# ── MongoDB (optional – logs rich chat history) ───────────────────────────
+try:
+    from pymongo import MongoClient
+    _MONGO_URL = os.getenv("MONGODB_URL", "")
+    _mongo_client = MongoClient(_MONGO_URL, serverSelectionTimeoutMS=3000) if _MONGO_URL else None
+    _mongo_db = _mongo_client["planLectorDB"] if _mongo_client else None
+    _chat_logs = _mongo_db["chat_logs"] if _mongo_db else None
+    if _mongo_client:
+        _mongo_client.admin.command("ping")  # verify connection
+        print("MongoDB connected.")
+    else:
+        print("MONGODB_URL not set — MongoDB logging disabled.")
+except Exception as _mongo_err:
+    print(f"MongoDB connection failed (non-fatal): {_mongo_err}")
+    _chat_logs = None
 
 # ── Filtro de contenido (insultos, racismo, odio) ─────────────────
 # Añade modelo/ al path para poder importar filtro.py directamente
@@ -112,9 +129,22 @@ async def chat_endpoint(query: ChatQuery, db: Session = Depends(get_db)) -> Chat
         respuesta = "Ahora mismo no puedo consultar el índice de contexto. Inténtalo de nuevo."
         fuentes = []
 
-    # ── 3. Registrar en BD y devolver ────────────────────────────────
+    # ── 3. Registrar en PostgreSQL ────────────────────────────────────
     new_log = Interaction(session_id=query.session_id, question=pregunta, answer=respuesta)
     db.add(new_log)
     db.commit()
+
+    # ── 4. Registrar en MongoDB (historial rico) ──────────────────────
+    if _chat_logs is not None:
+        try:
+            _chat_logs.insert_one({
+                "session_id": query.session_id,
+                "question": pregunta,
+                "answer": respuesta,
+                "sources": fuentes,
+                "timestamp": datetime.datetime.utcnow(),
+            })
+        except Exception as mongo_err:
+            print(f"MongoDB log failed (non-fatal): {mongo_err}")
 
     return ChatResponse(respuesta=respuesta, fuentes=fuentes)
