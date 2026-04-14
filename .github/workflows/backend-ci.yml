@@ -42,4 +42,4 @@ jobs:
             sudo docker pull ${{ secrets.DOCKERHUB_USERNAME }}/plan-lector-backend:latest
             sudo docker stop backend-app || true
             sudo docker rm backend-app || true
-            sudo docker run -d --name backend-app -p 8000:8000 -e CHROMA_DB_PATH=/app/backend/datalake/datalake/artifacts/chroma_db ${{ secrets.DOCKERHUB_USERNAME }}/plan-lector-backend:latest
+            sudo docker run -d --name backend-app -p 8000:8000 -e CHROMA_DB_PATH=/app/datalake/datalake/artifacts/chroma_db ${{ secrets.DOCKERHUB_USERNAME }}/plan-lector-backend:latest
