@@ -3,8 +3,11 @@ from sqlalchemy.orm import declarative_base
 from sqlalchemy.orm import sessionmaker
 import datetime
 
+import os
+
 # Definimos la ubicación de la DB local [cite: 67]
-SQLALCHEMY_DATABASE_URL = "sqlite:///./backend/chatbot_plan_lector.db"
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+SQLALCHEMY_DATABASE_URL = f"sqlite:///{os.path.join(BASE_DIR, 'chatbot_plan_lector.db')}"
 
 engine = create_engine(
     SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False}
