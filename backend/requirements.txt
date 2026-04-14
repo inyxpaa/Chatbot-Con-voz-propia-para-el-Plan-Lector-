@@ -4,3 +4,4 @@ sqlalchemy
 pydantic
 chromadb
 google-auth
+psycopg2-binary
