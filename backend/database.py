@@ -18,11 +18,20 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
 
+class User(Base):
+    __tablename__ = "users"
+    id         = Column(Integer, primary_key=True, index=True)
+    email      = Column(String(128), unique=True, index=True, nullable=False)
+    name       = Column(String(128), nullable=True)
+    picture    = Column(String(256), nullable=True)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
 class Busqueda(Base):
     """Registro completo de cada búsqueda/consulta al chatbot."""
     __tablename__ = "busquedas"
 
     id                  = Column(Integer, primary_key=True, index=True)
+    user_email          = Column(String(128), index=True, nullable=True)
     session_id          = Column(String(64), index=True, nullable=True)
     pregunta            = Column(Text, nullable=False)
     respuesta           = Column(Text, nullable=True)
