@@ -14,13 +14,15 @@
 ==============================================================
 """
 
+# IMPORTANTE: Establecer antes de importar torch.distributed
 import os
-import json
+os.environ["USE_LIBUV"] = "0"        # TCPStore sin libuv (PyTorch Windows build)
+os.environ["PYTHONIOENCODING"] = "utf-8"  # Encoding correcto en consola Windows
 import torch
 import ray
 import ray.train
 from ray.train import ScalingConfig, RunConfig, CheckpointConfig
-from ray.train.torch import TorchTrainer
+from ray.train.torch import TorchTrainer, TorchConfig
 from ray.train.huggingface.transformers import (
     prepare_trainer,
     RayTrainReportCallback,
@@ -36,6 +38,8 @@ from transformers import (
 from peft import get_peft_model, LoraConfig, TaskType
 from datasets import Dataset
 
+import json
+
 # ------------------------------------------------------------------
 # RUTAS — se calculan relativas a la ubicación de este script
 # ------------------------------------------------------------------
@@ -50,11 +54,11 @@ OUTPUT_DIR   = os.path.join(_SCRIPT_DIR, "output", "qwen_finetuned")
 # PARÁMETROS GLOBALES
 # ------------------------------------------------------------------
 MODEL_NAME  = "Qwen/Qwen2.5-1.5B-Instruct"
-NUM_WORKERS = 4          # 1 master + 3 workers = 4 GPUs en total
-BLOCK_SIZE  = 2048       # Longitud máxima del contexto (Qwen2.5 soporta hasta 32k)
+NUM_WORKERS = 1          # Ajustar al número de GPUs disponibles (1 GPU local)
+BLOCK_SIZE  = 512        # Reducido para ahorrar VRAM en una sola GPU
 EPOCHS      = 3
-BATCH_SIZE  = 2          # Por dispositivo (GPU de 12 GB)
-GRAD_ACCUM  = 4          # Batch efectivo = 2 * 4 * 4 GPUs = 32
+BATCH_SIZE  = 1          # Reducido para una sola GPU
+GRAD_ACCUM  = 8          # Batch efectivo = 1 * 8 * 1 GPU = 8
 
 
 # ==================================================================
@@ -105,22 +109,32 @@ def tokenizar_dataset(
     block_size: int,
 ) -> Dataset:
     """
-    Tokeniza la lista de textos y los agrupa en bloques de longitud fija.
+    Tokeniza TODOS los textos, los concatena en una sola secuencia y los
+    parte en bloques de longitud fija (block_size).
+    Esto garantiza que ningún ejemplo se descarte por ser demasiado corto.
     Para Causal LM, input_ids == labels (HuggingFace desplaza los labels internamente).
     """
-    bloques_ids = []
-
+    # 1. Tokenizar todos los ejemplos y concatenar en una única secuencia
+    todos_ids: list[int] = []
+    eos_id = tokenizer.eos_token_id or 0
     for texto in ejemplos_texto:
         ids = tokenizer.encode(texto, add_special_tokens=False)
-        # Agrupar en bloques de block_size
-        for i in range(0, len(ids) - block_size + 1, block_size):
-            bloques_ids.append(ids[i : i + block_size])
+        todos_ids.extend(ids)
+        todos_ids.append(eos_id)  # separador entre conversaciones
+
+    # 2. Partir en bloques de block_size (descartar el residuo final)
+    bloques_ids = [
+        todos_ids[i : i + block_size]
+        for i in range(0, len(todos_ids) - block_size + 1, block_size)
+    ]
 
     if not bloques_ids:
-        raise ValueError(
-            f"[!] No se generaron bloques. "
-            f"Comprueba que el dataset tiene texto y BLOCK_SIZE={block_size} es adecuado."
-        )
+        # Si la secuencia completa es más corta que block_size, usar todo lo que hay
+        # con padding al tamaño máximo para no perder datos
+        pad_id = tokenizer.pad_token_id or eos_id
+        bloque = todos_ids[:block_size]
+        bloque += [pad_id] * (block_size - len(bloque))
+        bloques_ids = [bloque]
 
     return Dataset.from_dict({"input_ids": bloques_ids})
 
@@ -190,6 +204,9 @@ def train_loop_per_worker(config: dict):
         target_modules=["q_proj", "v_proj", "k_proj", "o_proj"],
     )
     model = get_peft_model(model, lora_config)
+    # Necesario para gradient checkpointing + LoRA: asegura que los inputs
+    # de la capa de embedding tengan grad_fn aunque el modelo base esté congelado.
+    model.enable_input_require_grads()
 
     if rank == 0:
         model.print_trainable_parameters()
@@ -201,7 +218,7 @@ def train_loop_per_worker(config: dict):
         gradient_accumulation_steps=grad_accum,
         learning_rate=2e-4,
         num_train_epochs=epochs,
-        evaluation_strategy="epoch",
+        eval_strategy="epoch",
         save_strategy="epoch",
         logging_steps=10,
         bf16=True,                      # Aceleración nativa RTX 40xx
@@ -269,10 +286,19 @@ if __name__ == "__main__":
     print(f"[✓] Workers Ray              : {NUM_WORKERS}")
     print()
 
-    # Conectar al cluster Ray que ya está corriendo en los 4 nodos
-    # Si Ray no está activo en el nodo, usa ray.init() sin argumentos (modo local)
-    ray.init(address="auto")
-    print(f"[✓] Conectado al cluster Ray: {ray.cluster_resources()}")
+    # Variables de entorno que deben propagarse a TODOS los workers de Ray
+    _ray_env = {
+        "USE_LIBUV": "0",
+        "PYTHONIOENCODING": "utf-8",
+    }
+
+    # Intentar conectar al cluster Ray externo; si no existe, arrancar en modo local
+    try:
+        ray.init(address="auto", runtime_env={"env_vars": _ray_env})
+        print(f"[OK] Conectado al cluster Ray externo: {ray.cluster_resources()}")
+    except Exception:
+        ray.init(runtime_env={"env_vars": _ray_env})  # Modo local
+        print(f"[OK] Ray iniciado en modo LOCAL: {ray.cluster_resources()}")
 
     os.makedirs(OUTPUT_DIR, exist_ok=True)
 
@@ -288,11 +314,13 @@ if __name__ == "__main__":
         "grad_accum" : GRAD_ACCUM,
     }
 
-    # Configuración de escalado: 4 workers, 1 GPU cada uno
+    # Configuración de escalado: NUM_WORKERS GPUs
+    import torch as _torch
+    _gpu_available = _torch.cuda.is_available()
     scaling_config = ScalingConfig(
         num_workers=NUM_WORKERS,
-        use_gpu=True,
-        resources_per_worker={"GPU": 1, "CPU": 4},
+        use_gpu=_gpu_available,
+        resources_per_worker={"GPU": 1 if _gpu_available else 0, "CPU": 4},
     )
 
     # Configuración de ejecución y checkpoints
@@ -305,11 +333,16 @@ if __name__ == "__main__":
     )
 
     # Crear y lanzar el TorchTrainer de Ray
+    # backend="gloo": único backend distribuido disponible en Windows
+    # (NCCL solo funciona en Linux; gloo soporta GPU en modo single-node)
+    torch_config = TorchConfig(backend="gloo")
+
     trainer = TorchTrainer(
         train_loop_per_worker=train_loop_per_worker,
         train_loop_config=train_config,
         scaling_config=scaling_config,
         run_config=run_config,
+        torch_config=torch_config,
     )
 
     print("\n[→] Lanzando entrenamiento distribuido en el cluster Ray...\n")
