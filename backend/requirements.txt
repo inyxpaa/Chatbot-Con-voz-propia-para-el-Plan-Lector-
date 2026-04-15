@@ -3,5 +3,7 @@ uvicorn
 sqlalchemy
 pydantic
 chromadb
-google-auth
+requests
+beautifulsoup4
 psycopg2-binary
+pymongo
