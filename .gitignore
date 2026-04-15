@@ -1,3 +1,7 @@
+### Modelo entrenado — se aloja en Hugging Face, no en GitHub
+backend/modelo/entrenamiento/output/
+backend/modelo/entrenamiento/ray_results/
+
 ### Backend / Python
 venv/
 env/
