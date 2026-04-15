@@ -29,4 +29,3 @@ backend/static/*
 
 *.log
 
-backend/datalake/datalake/artifacts/chroma_db/

@@ -1,4 +1,5 @@
 import os
+import sys
 from pathlib import Path
 import chromadb
 from sqlalchemy.orm import Session
@@ -61,7 +62,7 @@ def get_db():
 # --- LÓGICA DE CHROMADB (Mantenemos lo que ya tenías) ---
 def get_chroma_paths() -> tuple[str, str]:
     base_dir = Path(__file__).resolve().parent.parent
-    default_db = base_dir / "backend" / "datalake" / "datalake" / "artifacts" / "chroma_db"
+    default_db = base_dir / "backend" / "datalake" / "artifacts" / "chroma_db"
     db_path = os.getenv("CHROMA_DB_PATH", str(default_db))
     collection_name = os.getenv("CHROMA_COLLECTION", "quijote")
     return db_path, collection_name

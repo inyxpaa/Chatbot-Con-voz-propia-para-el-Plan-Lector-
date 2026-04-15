@@ -1,0 +1,31 @@
+# ============================================================
+#  Chatbot Plan Lector — Dependencias del módulo modelo
+# ============================================================
+
+# --- Embeddings ---
+sentence-transformers==3.0.1
+
+# --- Búsqueda vectorial ---
+faiss-cpu==1.8.0
+
+# --- Núcleo numérico ---
+numpy==1.26.4
+
+# --- Utilidades ---
+tqdm==4.66.4          # Barras de progreso en la ingestión
+
+# --- Lectura de documentos del Data Lake ---
+PyPDF2>=3.0.0         # Lectura de archivos PDF
+ebooklib>=0.18        # Lectura de archivos EPUB
+beautifulsoup4>=4.12  # Extracción de texto HTML interno del EPUB
+
+# --- Entrenamiento Distribuido (Cluster Spark) ---
+horovod[spark]>=0.28.1
+pyspark>=3.5.0
+transformers>=4.40.1
+peft>=0.10.0
+bitsandbytes>=0.43.1
+accelerate>=0.29.3
+datasets>=2.18.0
+pandas>=2.0.0
+pyarrow>=15.0.0

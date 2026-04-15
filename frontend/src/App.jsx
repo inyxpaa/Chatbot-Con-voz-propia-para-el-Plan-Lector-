@@ -25,6 +25,10 @@ function asegurarIdSesion() {
 }
 
 function urlEndpoint() {
+  const apiBase = import.meta.env.VITE_BACKEND_URL;
+  if (apiBase) {
+    return new URL("/chat", apiBase).toString();
+  }
   try {
     return new URL("/chat", window.location.origin).toString();
   } catch {
