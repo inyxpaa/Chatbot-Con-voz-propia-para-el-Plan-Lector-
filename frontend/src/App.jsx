@@ -1,58 +1,41 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { Routes, Route, Navigate, useNavigate, Link } from "react-router-dom";
+import { LogOut, Shield, MessageSquare, Loader2 } from "lucide-react";
+import LoginPage from "./LoginPage";
+import AdminPanel from "./AdminPanel";
 
-const CLAVE_STORAGE = "chat_session_id";
+const CLAVE_STORAGE_SESION = "chat_session_id";
+const CLAVE_STORAGE_TOKEN = "google_auth_token";
+const CLAVE_STORAGE_USER = "google_auth_user";
 
+// --- Helpers ---
 function asegurarIdSesion() {
-  let idSesion = sessionStorage.getItem(CLAVE_STORAGE);
+  let idSesion = sessionStorage.getItem(CLAVE_STORAGE_SESION);
   if (idSesion) return idSesion;
-
-  if (window.crypto && typeof window.crypto.randomUUID === "function") {
-    idSesion = window.crypto.randomUUID();
-  } else {
-    const bytes =
-      window.crypto && window.crypto.getRandomValues
-        ? window.crypto.getRandomValues(new Uint8Array(16))
-        : new Uint8Array(Array.from({ length: 16 }, () => Math.floor(Math.random() * 256)));
-
-    bytes[6] = (bytes[6] & 0x0f) | 0x40;
-    bytes[8] = (bytes[8] & 0x3f) | 0x80;
-    const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
-    idSesion = `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
-  }
-
-  sessionStorage.setItem(CLAVE_STORAGE, idSesion);
+  idSesion = crypto.randomUUID?.() || Math.random().toString(36).substring(2);
+  sessionStorage.setItem(CLAVE_STORAGE_SESION, idSesion);
   return idSesion;
 }
 
-function urlEndpoint() {
-  const apiBase = import.meta.env.VITE_BACKEND_URL;
-  if (apiBase) {
-    return new URL("/chat", apiBase).toString();
-  }
-  try {
-    return new URL("/chat", window.location.origin).toString();
-  } catch {
-    return "/chat";
-  }
+function urlEndpoint(path = "/chat") {
+  const apiBase = import.meta.env.VITE_BACKEND_URL || window.location.origin;
+  return `${apiBase.replace(/\/$/, "")}${path}`;
 }
 
 function formatearHora(d = new Date()) {
-  try {
-    return new Intl.DateTimeFormat("es-ES", { hour: "2-digit", minute: "2-digit" }).format(d);
-  } catch {
-    return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
-  }
+  return new Intl.DateTimeFormat("es-ES", { hour: "2-digit", minute: "2-digit" }).format(d);
 }
 
-export default function App() {
+// --- Componente Chat Principal ---
+const Chat = ({ token, user, onLogout }) => {
   const idSesion = useMemo(() => asegurarIdSesion(), []);
   const [ocupado, setOcupado] = useState(false);
   const [entrada, setEntrada] = useState("");
-  const [mensajes, setMensajes] = useState(() => [
+  const [mensajes, setMensajes] = useState([
     {
-      id: crypto?.randomUUID?.() ?? String(Date.now()),
+      id: "bot-start",
       role: "bot",
-      text: "Hola. Dime qué necesitas del Plan Lector.",
+      text: `Hola ${user.name.split(' ')[0]}. Dime qué necesitas del Plan Lector.`,
       fuentes: [],
       isError: false,
       time: formatearHora(),
@@ -60,25 +43,24 @@ export default function App() {
   ]);
 
   const listaRef = useRef(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
-    const el = listaRef.current;
-    if (!el) return;
-    el.scrollTop = el.scrollHeight;
-  }, [mensajes.length]);
+    if (listaRef.current) {
+      listaRef.current.scrollTop = listaRef.current.scrollHeight;
+    }
+  }, [mensajes]);
 
-  async function enviarMensaje(texto) {
+  const enviarMensaje = async (texto) => {
     const textoLimpio = texto.trim();
     if (!textoLimpio) return;
 
     setMensajes((prev) => [
       ...prev,
       {
-        id: (crypto?.randomUUID?.() ?? `${Date.now()}-u`),
+        id: Date.now() + "-u",
         role: "user",
         text: textoLimpio,
-        fuentes: null,
-        isError: false,
         time: formatearHora(),
       },
     ]);
@@ -87,43 +69,35 @@ export default function App() {
     setEntrada("");
 
     try {
-      const resp = await fetch(urlEndpoint(), {
+      const resp = await fetch(urlEndpoint("/chat"), {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
         body: JSON.stringify({ mensaje: textoLimpio, session_id: idSesion }),
       });
 
-      if (!resp.ok) {
-        if (resp.status === 400) {
-          throw new Error("No puedo procesar ese mensaje. Prueba a reformularlo.");
-        }
-        throw new Error("Ahora mismo no puedo responder. Inténtalo de nuevo en un momento.");
-      }
+      if (!resp.ok) throw new Error("Error en el servidor. Revisa tu conexión.");
 
       const data = await resp.json();
-      const respuesta = typeof data?.respuesta === "string" ? data.respuesta : "No he podido generar una respuesta.";
-      const fuentes = Array.isArray(data?.fuentes) ? data.fuentes : [];
-
       setMensajes((prev) => [
         ...prev,
         {
-          id: (crypto?.randomUUID?.() ?? `${Date.now()}-b`),
+          id: Date.now() + "-b",
           role: "bot",
-          text: respuesta,
-          fuentes,
-          isError: false,
+          text: data.respuesta,
+          fuentes: data.fuentes || [],
           time: formatearHora(),
         },
       ]);
     } catch (e) {
-      const msg = e instanceof Error ? e.message : "Error de red. Revisa tu conexión e inténtalo de nuevo.";
       setMensajes((prev) => [
         ...prev,
         {
-          id: (crypto?.randomUUID?.() ?? `${Date.now()}-e`),
+          id: Date.now() + "-e",
           role: "bot",
-          text: msg,
-          fuentes: [],
+          text: "Hubo un problema. Inténtalo de nuevo.",
           isError: true,
           time: formatearHora(),
         },
@@ -131,33 +105,34 @@ export default function App() {
     } finally {
       setOcupado(false);
     }
-  }
+  };
 
-  function alEnviar(e) {
-    e.preventDefault();
-    void enviarMensaje(entrada);
-  }
+  const isAdmin = ["gsoriano@iescomercio.com", "test@example.com"].includes(user.email);
 
   return (
     <main className="chatbot-app">
-      <section className="chatbot-container" aria-label="Chat del Plan Lector">
+      <section className="chatbot-container">
         <header className="chatbot-header">
           <div className="chatbot-header__title">
             <h1 className="chatbot-title">Plan Lector</h1>
-            <p className="chatbot-subtitle">Ayuda y consultas</p>
+            <div className="user-info-mini">
+               <img src={user.picture} alt="" className="user-avatar-mini" referrerPolicy="no-referrer" />
+               <span>{user.name}</span>
+            </div>
           </div>
-          <div className="chatbot-header__meta">
-            {ocupado ? <span className="chatbot-typing">Escribiendo…</span> : null}
+          <div className="header-actions">
+            {isAdmin && (
+              <Link to="/admin" className="admin-link-btn" title="Panel Admin">
+                <Shield size={20} />
+              </Link>
+            )}
+            <button onClick={onLogout} className="logout-btn" title="Cerrar Sesión">
+              <LogOut size={20} />
+            </button>
           </div>
         </header>
 
-        <section
-          ref={listaRef}
-          className="chatbot-messages"
-          role="log"
-          aria-live="polite"
-          aria-relevant="additions"
-        >
+        <section ref={listaRef} className="chatbot-messages">
           {mensajes.map((m) => (
             <div key={m.id} className={`chatbot-message chatbot-message--${m.role}`}>
               <div className="chatbot-bubble">
@@ -166,40 +141,80 @@ export default function App() {
                 </p>
                 <div className="chatbot-bubble__meta">
                   <span className="chatbot-time">{m.time}</span>
-                  {m.role === "bot" && Array.isArray(m.fuentes) && m.fuentes.length > 0 ? (
+                  {m.role === "bot" && m.fuentes?.length > 0 && (
                     <span className="chatbot-sources">
-                      <span className="chatbot-sources__label">Referencias:</span> {m.fuentes.join(", ")}
+                      Ref: {m.fuentes.join(", ")}
                     </span>
-                  ) : null}
+                  )}
                 </div>
               </div>
             </div>
           ))}
+          {ocupado && <div className="typing-indicator">Escuchando...</div>}
         </section>
 
-        <form className="chatbot-form" onSubmit={alEnviar} autoComplete="off">
-          <label className="chatbot-label" htmlFor="chatbot-input">Mensaje</label>
+        <form className="chatbot-form" onSubmit={(e) => { e.preventDefault(); enviarMensaje(entrada); }} autoComplete="off">
           <div className="chatbot-inputRow">
             <input
-              id="chatbot-input"
               className="chatbot-input"
               type="text"
-              inputMode="text"
-              placeholder="Escribe aquí…"
-              maxLength={2000}
+              placeholder="Pregunta algo sobre los libros..."
               required
               value={entrada}
               onChange={(e) => setEntrada(e.target.value)}
               disabled={ocupado}
             />
             <button className="chatbot-send" type="submit" disabled={ocupado}>
-              Enviar
+              <MessageSquare size={18} />
             </button>
           </div>
-          <p className="chatbot-hint">Pulsa Enter para enviar.</p>
         </form>
       </section>
     </main>
   );
-}
+};
 
+// --- App Principal con Rutas ---
+export default function App() {
+  const [token, setToken] = useState(localStorage.getItem(CLAVE_STORAGE_TOKEN));
+  const [user, setUser] = useState(JSON.parse(localStorage.getItem(CLAVE_STORAGE_USER) || "null"));
+
+  const handleLoginSuccess = (response) => {
+    const jwtToken = response.credential;
+    setToken(jwtToken);
+    localStorage.setItem(CLAVE_STORAGE_TOKEN, jwtToken);
+    
+    // Decodificar el nombre/email del base64 del JWT (simplificado)
+    try {
+      const payload = JSON.parse(atob(jwtToken.split(".")[1]));
+      const userData = {
+        email: payload.email,
+        name: payload.name,
+        picture: payload.picture
+      };
+      setUser(userData);
+      localStorage.setItem(CLAVE_STORAGE_USER, JSON.stringify(userData));
+    } catch (e) {
+      console.error("Error decoding token", e);
+    }
+  };
+
+  const handleLogout = () => {
+    setToken(null);
+    setUser(null);
+    localStorage.removeItem(CLAVE_STORAGE_TOKEN);
+    localStorage.removeItem(CLAVE_STORAGE_USER);
+  };
+
+  if (!token) {
+    return <LoginPage onLoginSuccess={handleLoginSuccess} />;
+  }
+
+  return (
+    <Routes>
+      <Route path="/" element={<Chat token={token} user={user} onLogout={handleLogout} />} />
+      <Route path="/admin" element={<AdminPanel token={token} user={user} />} />
+      <Route path="*" element={<Navigate to="/" />} />
+    </Routes>
+  );
+}
