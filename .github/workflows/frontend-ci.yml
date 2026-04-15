@@ -26,15 +26,22 @@ jobs:
           context: ./frontend
           push: true
           tags: ${{ secrets.DOCKERHUB_USERNAME }}/plan-lector-frontend:latest
-          build-args: |
-            VITE_BACKEND_URL=http://${{ secrets.EC2_HOST_BACKEND }}:8000
+      - name: Fetch Backend Private IP
+        run: |
+          echo "${{ secrets.EC2_SSH_KEY }}" > private_key.pem
+          chmod 600 private_key.pem
+          PRIVATE_IP=$(ssh -o StrictHostKeyChecking=no -i private_key.pem ${{ secrets.EC2_USERNAME }}@${{ secrets.EC2_HOST_BACKEND }} "hostname -I | awk '{print \$1}'")
+          echo "BACKEND_PRIVATE_IP=$PRIVATE_IP" >> $GITHUB_ENV
 
       - name: Deploy to EC2
         uses: appleboy/ssh-action@v0.1.10
+        env:
+          BACKEND_PRIVATE_IP: ${{ env.BACKEND_PRIVATE_IP }}
         with:
           host: ${{ secrets.EC2_HOST_FRONTEND }}
           username: ${{ secrets.EC2_USERNAME }}
           key: ${{ secrets.EC2_SSH_KEY }}
+          envs: BACKEND_PRIVATE_IP
           script: |
             if ! command -v docker &> /dev/null; then
               curl -fsSL https://get.docker.com -o get-docker.sh
@@ -44,4 +51,4 @@ jobs:
             sudo docker pull ${{ secrets.DOCKERHUB_USERNAME }}/plan-lector-frontend:latest
             sudo docker stop frontend-app || true
             sudo docker rm frontend-app || true
-            sudo docker run -d --name frontend-app -p 80:80 ${{ secrets.DOCKERHUB_USERNAME }}/plan-lector-frontend:latest
+            sudo docker run -d --name frontend-app -e BACKEND_INTERNAL_IP=$BACKEND_PRIVATE_IP -p 80:80 ${{ secrets.DOCKERHUB_USERNAME }}/plan-lector-frontend:latest
