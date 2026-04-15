@@ -12,10 +12,12 @@ import os
 import pandas as pd
 from transformers import AutoTokenizer
 
-# Importar lógica de lectura del Data Lake desde ingesta.py
-import sys
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from ingesta import cargar_documentos_datalake, DATA_LAKE_DIR
+# Directorio donde se guardará el dataset para PySpark
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DATASET_DIR = os.path.join(BASE_DIR, "data", "dataset_entrenamiento")
+os.makedirs(DATASET_DIR, exist_ok=True)
+
+DATA_LAKE_DIR = os.path.join(BASE_DIR, "datalake", "raw")
 
 # Directorio donde se guardará el dataset para PySpark
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -24,6 +26,45 @@ os.makedirs(DATASET_DIR, exist_ok=True)
 
 MODEL_NAME = "Qwen/Qwen2.5-1.5B-Instruct"
 BLOCK_SIZE = 512  # Longitud máxima de secuencia para el entrenamiento
+
+# --- LECTORES MULTI-FORMATO DEL DATALAKE ---
+def _leer_txt(ruta: str) -> str:
+    with open(ruta, "r", encoding="utf-8", errors="replace") as f: return f.read().strip()
+
+def _leer_pdf(ruta: str) -> str:
+    try:
+        import PyPDF2
+        texto = []
+        with open(ruta, "rb") as f:
+            for pagina in PyPDF2.PdfReader(f).pages:
+                if c := pagina.extract_text(): texto.append(c.strip())
+        return "\n\n".join(texto)
+    except: return ""
+
+def _leer_epub(ruta: str) -> str:
+    try:
+        import ebooklib
+        from ebooklib import epub
+        from bs4 import BeautifulSoup
+        partes = []
+        for item in epub.read_epub(ruta).get_items_of_type(ebooklib.ITEM_DOCUMENT):
+            texto = BeautifulSoup(item.get_content(), "html.parser").get_text(separator="\n").strip()
+            if texto: partes.append(texto)
+        return "\n\n".join(partes)
+    except: return ""
+
+LECTORES = {".txt": _leer_txt, ".md": _leer_txt, ".pdf": _leer_pdf, ".epub": _leer_epub}
+
+def cargar_documentos_datalake(datalake_raw_dir: str) -> list[dict]:
+    documentos = []
+    if not os.path.isdir(datalake_raw_dir): return []
+    for nombre in sorted(os.listdir(datalake_raw_dir)):
+        ext = os.path.splitext(nombre)[1].lower()
+        if ext in LECTORES:
+            texto = LECTORES[ext](os.path.join(datalake_raw_dir, nombre))
+            if texto: documentos.append({"filename": nombre, "text": texto})
+    return documentos
+# -------------------------------------------
 
 def main():
     print("=" * 60)
