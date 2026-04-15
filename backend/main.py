@@ -7,7 +7,7 @@ from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
-from .database import SessionLocal, create_tables, Interaction
+from database import SessionLocal, create_tables, Interaction
 
 # ── Filtro de contenido (insultos, racismo, odio) ─────────────────
 # Añade modelo/ al path para poder importar filtro.py directamente
