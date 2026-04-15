@@ -1,3 +1,4 @@
+# --- Chatbot Plan Lector v2.0 (HF enabled) ---
 import os
 import sys
 import json
