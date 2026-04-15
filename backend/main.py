@@ -7,6 +7,7 @@ from google.oauth2 import id_token
 from google.auth.transport import requests
 from fastapi import FastAPI, Depends, HTTPException, Header
 from .database import SessionLocal, create_tables, Interaction, User, RedFlag
+from .modelo.filtro import verificar_consulta
 
 # Importamos lo que creamos en database.py
 from .database import SessionLocal, create_tables, Interaction, User, RedFlag
@@ -20,7 +21,7 @@ app = FastAPI(title="Chatbot 'Con voz propia' API")
 
 
 # --- SEGURIDAD ---
-GOOGLE_CLIENT_ID = "TU_CLIENT_ID_DE_GOOGLE.apps.googleusercontent.com"
+GOOGLE_CLIENT_ID = "22015513342-rp17v8jccio7gvnhkdma2vpigerrnu44.apps.googleusercontent.com"
 
 
 def obtener_usuario_google(token_google: str = Header(None)):
@@ -90,43 +91,48 @@ def read_root():
 
 @app.post("/chat")
 async def chat_endpoint(
-    query: ChatQuery,
+    query: ChatQuery, 
     db: Session = Depends(get_db),
     user_email: str = Depends(obtener_usuario_google)
 ) -> ChatResponse:
-   
+    
     pregunta = query.mensaje.strip()
-   
-    # 1. FILTRO DE TOXICIDAD (Simulado)
-    palabras_prohibidas = ["tonto", "feo", "insulto123"]
-    if any(p in pregunta.lower() for p in palabras_prohibidas):
-        # Guardamos la infracción
-        nueva_infraccion = RedFlag(user_email=user_email, content=pregunta)
-        db.add(nueva_infraccion)
-        db.commit()
+    
+    # 1. PASAR EL FILTRO DE CONTENIDO
+    # El filtro normaliza el texto para evitar evasiones antes de analizarlo
+    resultado_filtro = verificar_consulta(pregunta)
+
+    # 2. SI LA CONSULTA ES OFENSIVA
+    if not resultado_filtro["aceptado"]:
+        # REGISTRO EN RED_FLAGS: Guardamos quién y qué dijo
+        nueva_infraccion = RedFlag(
+            user_email=user_email, 
+            content=pregunta
+        )
+        db.add(nueva_infraccion)     
+        
+        db.commit() # Guardamos ambos registros en Postgres
+
         return ChatResponse(
-            respuesta="Se ha detectado lenguaje inapropiado. Tu consulta ha sido registrada.",
+            respuesta=resultado_filtro["mensaje"], # Mensaje educativo configurado en el filtro
             fuentes=[]
         )
 
-
-    # 2. PROCESAMIENTO NORMAL
+    # 3. SI LA CONSULTA ES VÁLIDA: Proceso normal
     try:
         docs, fuentes = recuperar_contexto(pregunta)
         respuesta = generar_respuesta(pregunta, docs)
     except Exception as e:
-        respuesta = "Error técnico al consultar el contexto."
+        respuesta = "Error al conectar con el corpus del Plan Lector."
         fuentes = []
 
-
-    # 3. GUARDAR INTERACCIÓN
-    new_log = Interaction(
-        user_email=user_email,
-        question=pregunta,
+    # REGISTRO EN INTERACTIONS: Guardamos la consulta limpia y su respuesta
+    nueva_interaccion = Interaction(
+        user_email=user_email, 
+        question=pregunta, 
         answer=respuesta
     )
-    db.add(new_log)
+    db.add(nueva_interaccion)
     db.commit()
-
 
     return ChatResponse(respuesta=respuesta, fuentes=fuentes)

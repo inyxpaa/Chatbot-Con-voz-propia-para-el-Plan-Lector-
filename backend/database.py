@@ -4,7 +4,6 @@ from sqlalchemy.orm import sessionmaker
 import datetime
 
 SQLALCHEMY_DATABASE_URL = "postgresql://postgres:1234@localhost:5432/chatbot_db"
-
 engine = create_engine(SQLALCHEMY_DATABASE_URL)
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
@@ -36,3 +35,4 @@ class RedFlag(Base):
 
 def create_tables():
     Base.metadata.create_all(bind=engine)
+
