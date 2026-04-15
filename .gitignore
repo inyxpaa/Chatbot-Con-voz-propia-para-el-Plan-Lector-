@@ -32,4 +32,5 @@ backend/static/*
 !backend/static/.gitkeep
 
 *.log
-
+*.ppk
+*.pem
