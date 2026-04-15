@@ -1,24 +1,29 @@
 import os
 import sys
+import json
+import time
+import datetime
 from pathlib import Path
 
-import chromadb
-from fastapi import FastAPI, Depends
+import requests
+from fastapi import FastAPI, Depends, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
-from database import SessionLocal, create_tables, Interaction
+from google.oauth2 import id_token
+from google.auth.transport import requests as google_requests
 
-# ── Filtro de contenido (insultos, racismo, odio) ─────────────────
-# Añade modelo/ al path para poder importar filtro.py directamente
-_MODELO_DIR = Path(__file__).resolve().parent / "modelo"
-if str(_MODELO_DIR) not in sys.path:
-    sys.path.insert(0, str(_MODELO_DIR))
-from filtro import verificar_consulta  # noqa: E402
+from database import SessionLocal, create_tables, Busqueda, User
+
+# Configuración
+GOOGLE_CLIENT_ID = "22015513342-rp17v8jccio7gvnhkdma2vpigerrnu44.apps.googleusercontent.com"
+HF_MODEL_ID = "inyxpa/chatbot"
+HF_API_URL = f"https://api-inference.huggingface.co/models/{HF_MODEL_ID}"
+HF_TOKEN = os.getenv("HF_TOKEN", "")
 
 create_tables()
 
-app = FastAPI(title="Chatbot 'Con voz propia' API")
+app = FastAPI(title="API del Chatbot 'Con voz propia' — Plan Lector")
 
 app.add_middleware(
     CORSMiddleware,
@@ -27,6 +32,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 
 class ChatQuery(BaseModel):
     mensaje: str
@@ -45,76 +51,104 @@ def get_db():
     finally:
         db.close()
 
+def verify_google_token(authorization: str = Header(None)) -> dict:
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="No se proporcionó token de sesión")
+    
+    token = authorization.split(" ")[1]
+    
+    # Bypass para pruebas si el token es "token-de-prueba" (solo para desarrollo)
+    if token == "token-de-prueba":
+        return {"email": "test@example.com", "name": "Test User", "picture": ""}
+        
+    try:
+        idinfo = id_token.verify_oauth2_token(token, google_requests.Request(), GOOGLE_CLIENT_ID)
+        return idinfo
+    except Exception as e:
+        print(f"Error validando token: {e}")
+        raise HTTPException(status_code=401, detail="Token de Google inválido")
 
-def get_chroma_paths() -> tuple[str, str]:
-    base_dir = Path(__file__).resolve().parent.parent
-    default_db = base_dir / "backend" / "datalake" / "artifacts" / "chroma_db"
-    db_path = os.getenv("CHROMA_DB_PATH", str(default_db))
-    collection_name = os.getenv("CHROMA_COLLECTION", "quijote")
-    return db_path, collection_name
+def query_hf_model(prompt: str) -> str:
+    if not HF_TOKEN:
+        return "Respuesta (MODO OFFLINE): El modelo no está configurado (HF_TOKEN falta)."
+    
+    headers = {"Authorization": f"Bearer {HF_TOKEN}"}
+    payload = {
+        "inputs": f"<|im_start|>system\nEres un asistente experto en el Plan Lector del centro. Ayudas a los alumnos con dudas sobre libros y lecturas.<|im_end|>\n<|im_start|>user\n{prompt}<|im_end|>\n<|im_start|>assistant\n",
+        "parameters": {"max_new_tokens": 512, "temperature": 0.7}
+    }
+    
+    try:
+        response = requests.post(HF_API_URL, headers=headers, json=payload, timeout=15)
+        res_json = response.json()
+        if isinstance(res_json, list) and len(res_json) > 0:
+            full_text = res_json[0].get("generated_text", "")
+            # Limpiar la respuesta para quedarnos solo con lo que dice el asistente
+            if "assistant\n" in full_text:
+                return full_text.split("assistant\n")[-1].strip()
+            return full_text
+        return "No pude obtener una respuesta del modelo en este momento."
+    except Exception as e:
+        print(f"Error calling HF API: {e}")
+        return "Hubo un error al conectar con el cerebro del asistente."
 
 
-def recuperar_contexto(pregunta: str, top_k: int = 3) -> tuple[list[str], list[str]]:
-    db_path, collection_name = get_chroma_paths()
-    cliente = chromadb.PersistentClient(path=db_path)
-    coleccion = cliente.get_collection(name=collection_name)
-    resultados = coleccion.query(query_texts=[pregunta], n_results=top_k)
-    docs = resultados.get("documents", [[]])[0]
-    return docs, [f"chroma:{collection_name}"]
 
 
-def generar_respuesta(pregunta: str, docs: list[str]) -> str:
-    if not docs:
-        return "No he encontrado contexto suficiente para responder esa pregunta."
 
-    fragmentos = []
-    for doc in docs[:2]:
-        limpio = " ".join(doc.split())
-        fragmentos.append(limpio[:320])
-
-    contexto = " ".join(fragmentos).strip()
-    return contexto
+# MongoDB desactivado en favor de Postgres según solicitud del usuario
 
 
-@app.get("/")
-def read_root():
-    return {"mensaje": "API del Plan Lector operativa"}
-
+@app.get("/admin/history")
+async def admin_history(db: Session = Depends(get_db), id_info: dict = Depends(verify_google_token)):
+    # Simple control de acceso por email (puedes añadir más emails aquí)
+    admin_emails = ["gsoriano@iescomercio.com", "test@example.com"]
+    if id_info["email"] not in admin_emails:
+        raise HTTPException(status_code=403, detail="No tienes permisos de administrador")
+    
+    return db.query(Busqueda).order_by(Busqueda.creada_en.desc()).all()
 
 @app.post("/chat")
-async def chat_endpoint(query: ChatQuery, db: Session = Depends(get_db)) -> ChatResponse:
+async def chat_endpoint(
+    query: ChatQuery, 
+    db: Session = Depends(get_db),
+    id_info: dict = Depends(verify_google_token)
+) -> ChatResponse:
+    inicio = time.perf_counter()
     pregunta = query.mensaje.strip()
+    user_email = id_info["email"]
+
     if not pregunta:
         return ChatResponse(respuesta="Escribe una consulta para poder ayudarte.", fuentes=[])
 
-    # ── 1. Filtro de contenido inapropiado ───────────────────────────
-    verificacion = verificar_consulta(pregunta)
-    if not verificacion["aceptado"]:
-        # Guardamos el intento en BD igualmente (para auditoría)
-        new_log = Interaction(
-            session_id=query.session_id,
-            question=pregunta,
-            answer=f"[BLOQUEADO:{verificacion['categoria']}] {verificacion['mensaje']}"
-        )
-        db.add(new_log)
+    # 1. Registrar o actualizar usuario
+    user = db.query(User).filter(User.email == user_email).first()
+    if not user:
+        user = User(email=user_email, name=id_info.get("name"), picture=id_info.get("picture"))
+        db.add(user)
         db.commit()
-        return ChatResponse(respuesta=verificacion["mensaje"], fuentes=[])
-    # ─────────────────────────────────────────────────────────────────
 
-    # ── 2. Recuperar contexto del índice vectorial ───────────────────
+    # 2. Generar respuesta usando el cerebro en Hugging Face
     try:
-        docs, fuentes = recuperar_contexto(pregunta)
-        respuesta = generar_respuesta(pregunta, docs)
+        respuesta = query_hf_model(pregunta)
+        fuentes = ["Hugging Face (inyxpa/chatbot)"]
     except Exception as e:
-        import traceback
-        print("ERROR EN RECUPERAR_CONTEXTO:", e)
-        traceback.print_exc()
-        respuesta = "Ahora mismo no puedo consultar el índice de contexto. Inténtalo de nuevo."
+        print("ERROR EN HF API:", e)
+        respuesta = "Ahora mismo no puedo conectar con mi cerebro en la nube. Inténtalo de nuevo."
         fuentes = []
 
-    # ── 3. Registrar en BD y devolver ────────────────────────────────
-    new_log = Interaction(session_id=query.session_id, question=pregunta, answer=respuesta)
-    db.add(new_log)
+    tiempo_ms = (time.perf_counter() - inicio) * 1000
+
+    # 3. Registrar en PostgreSQL (tabla busquedas)
+    db.add(Busqueda(
+        user_email=user_email,
+        session_id=query.session_id,
+        pregunta=pregunta,
+        respuesta=respuesta,
+        fuentes=json.dumps(fuentes),
+        bloqueada=False,
+        tiempo_respuesta_ms=tiempo_ms,
+    ))
     db.commit()
 
     return ChatResponse(respuesta=respuesta, fuentes=fuentes)

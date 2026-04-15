@@ -5,3 +5,8 @@ pydantic
 chromadb
 requests
 beautifulsoup4
+psycopg2-binary
+pymongo
+google-auth
+python-jose[cryptography]
+python-multipart
