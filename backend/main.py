@@ -20,8 +20,11 @@ from database import SessionLocal, create_tables, Busqueda, User
 GOOGLE_CLIENT_ID = "22015513342-rp17v8jccio7gvnhkdma2vpigerrnu44.apps.googleusercontent.com"
 HF_MODEL_ID = "Qwen/Qwen2.5-1.5B-Instruct" 
 HF_ADAPTER_ID = "inyxpa/chatbot"
-HF_API_URL = "https://api-inference.huggingface.co/v1/chat/completions" # OpenAI-compatible endpoint
 HF_TOKEN = os.getenv("HF_TOKEN", "")
+
+# Variables globales para el modelo local (se cargan al inicio)
+assistant_model = None
+assistant_tokenizer = None
 
 create_tables()
 
@@ -70,43 +73,73 @@ def verify_google_token(authorization: str = Header(None)) -> dict:
         print(f"Error validando token: {e}")
         raise HTTPException(status_code=401, detail="Token de Google inválido")
 
-def query_hf_model(prompt: str) -> str:
-    if not HF_TOKEN:
-        return "Respuesta (MODO OFFLINE): El modelo no está configurado (HF_TOKEN falta)."
+def query_local_model(prompt: str) -> str:
+    """Genera respuesta usando el modelo cargado en memoria local."""
+    global assistant_model, assistant_tokenizer
     
-    headers = {
-        "Authorization": f"Bearer {HF_TOKEN}",
-        "Content-Type": "application/json"
-    }
-    
-    payload = {
-        "model": HF_MODEL_ID,
-        "messages": [
+    if assistant_model is None or assistant_tokenizer is None:
+        return "El cerebro del asistente aún se está cargando o no se pudo cargar. Prueba en unos segundos."
+        
+    try:
+        messages = [
             {"role": "system", "content": "Eres un asistente experto en el Plan Lector del centro. Ayudas a los alumnos con dudas sobre libros y lecturas."},
             {"role": "user", "content": prompt}
-        ],
-        "adapter_id": HF_ADAPTER_ID,
-        "max_tokens": 512,
-        "temperature": 0.7,
-        "stream": False
-    }
-    
-    try:
-        response = requests.post(HF_API_URL, headers=headers, json=payload, timeout=15)
-        if response.status_code != 200:
-            print(f"HF API returned {response.status_code}: {response.text}")
-            return "El asistente está descansando ahora mismo (modelo dormido o error en API)."
+        ]
         
-        try:
-            res_json = response.json()
-            return res_json["choices"][0]["message"]["content"].strip()
-        except (KeyError, IndexError, ValueError) as e:
-            print(f"Error parsing HF response: {e} | Response: {response.text[:200]}")
-            return "Recibí una respuesta extraña de mi cerebro. ¿Puedes preguntar de nuevo?"
+        # Aplicar el chat template del modelo
+        input_ids = assistant_tokenizer.apply_chat_template(
+            messages, 
+            add_generation_prompt=True, 
+            return_tensors="pt"
+        ).to("cpu")
+        
+        # Generar
+        outputs = assistant_model.generate(
+            input_ids, 
+            max_new_tokens=512, 
+            do_sample=True, 
+            temperature=0.7,
+            pad_token_id=assistant_tokenizer.eos_token_id
+        )
+        
+        # Omitir los tokens de entrada de la respuesta
+        decoded = assistant_tokenizer.decode(outputs[0][input_ids.shape[-1]:], skip_special_tokens=True)
+        return decoded.strip()
             
     except Exception as e:
-        print(f"Error calling HF API: {e}")
-        return "Hubo un error al conectar con el cerebro del asistente."
+        print(f"Error en inferencia local: {e}")
+        return "Hubo un error al procesar tu duda localmente. Inténtalo de nuevo."
+
+@app.on_event("startup")
+async def startup_event():
+    """Carga el modelo de IA al iniciar el servidor."""
+    global assistant_model, assistant_tokenizer
+    
+    print("Iniciando carga del modelo local...")
+    try:
+        import torch
+        from transformers import AutoModelForCausalLM, AutoTokenizer
+        from peft import PeftModel
+        
+        # Cargar Tokenizer
+        assistant_tokenizer = AutoTokenizer.from_pretrained(HF_MODEL_ID)
+        
+        # Cargar Modelo base en Float16 para ahorrar RAM
+        print(f"Cargando modelo base {HF_MODEL_ID}...")
+        base_model = AutoModelForCausalLM.from_pretrained(
+            HF_MODEL_ID,
+            torch_dtype=torch.float16,
+            low_cpu_mem_usage=True,
+            device_map="cpu"
+        )
+        
+        # Cargar el adaptador LoRA
+        print(f"Cargando adaptador {HF_ADAPTER_ID}...")
+        assistant_model = PeftModel.from_pretrained(base_model, HF_ADAPTER_ID)
+        
+        print("¡Modelo cargado y listo para usar localmente!")
+    except Exception as e:
+        print(f"FATAL: No se pudo cargar el modelo local al inicio: {e}")
 
 
 
@@ -144,13 +177,13 @@ async def chat_endpoint(
         db.add(user)
         db.commit()
 
-    # 2. Generar respuesta usando el cerebro en Hugging Face
+    # 2. Generar respuesta usando el modelo local
     try:
-        respuesta = query_hf_model(pregunta)
-        fuentes = ["Hugging Face (inyxpa/chatbot)"]
+        respuesta = query_local_model(pregunta)
+        fuentes = ["IA Local (Qwen 1.5B + Adapter)"]
     except Exception as e:
-        print("ERROR EN HF API:", e)
-        respuesta = "Ahora mismo no puedo conectar con mi cerebro en la nube. Inténtalo de nuevo."
+        print("ERROR EN INFERENCIA LOCAL:", e)
+        respuesta = "Ahora mismo no puedo procesar tu duda localmente. Inténtalo de nuevo."
         fuentes = []
 
     tiempo_ms = (time.perf_counter() - inicio) * 1000
