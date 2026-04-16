@@ -109,8 +109,7 @@ def query_local_model(prompt: str) -> str:
                 max_new_tokens=256, # Reducido de 512 para probar estabilidad
                 do_sample=True, 
                 temperature=0.7,
-                pad_token_id=assistant_tokenizer.eos_token_id,
-                device_map="cpu" # Asegurar explícitamente CPU
+                pad_token_id=assistant_tokenizer.eos_token_id
             )
         
         # Omitir los tokens de entrada de la respuesta
