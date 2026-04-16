@@ -96,16 +96,18 @@ def query_local_model(prompt: str) -> str:
         ]
         
         # Aplicar el chat template del modelo
-        input_ids = assistant_tokenizer.apply_chat_template(
+        inputs = assistant_tokenizer.apply_chat_template(
             messages, 
             add_generation_prompt=True, 
-            return_tensors="pt"
+            return_tensors="pt",
+            return_dict=True
         ).to("cpu")
         
         # Generar (limitar el tamaño para evitar OOM si es necesario)
         with torch.no_grad():
             outputs = assistant_model.generate(
-                input_ids, 
+                inputs["input_ids"],
+                attention_mask=inputs.get("attention_mask"),
                 max_new_tokens=256, # Reducido de 512 para probar estabilidad
                 do_sample=True, 
                 temperature=0.7,
@@ -113,7 +115,8 @@ def query_local_model(prompt: str) -> str:
             )
         
         # Omitir los tokens de entrada de la respuesta
-        decoded = assistant_tokenizer.decode(outputs[0][input_ids.shape[-1]:], skip_special_tokens=True)
+        input_length = inputs["input_ids"].shape[-1]
+        decoded = assistant_tokenizer.decode(outputs[0][input_length:], skip_special_tokens=True)
         return decoded.strip()
             
     except Exception as e:
