@@ -162,12 +162,56 @@ async def startup_event():
 
 @app.get("/admin/history")
 async def admin_history(db: Session = Depends(get_db), id_info: dict = Depends(verify_google_token)):
-    # Simple control de acceso por email (puedes añadir más emails aquí)
-    admin_emails = ["gsoriano@iescomercio.com", "test@example.com"]
+    # Control de acceso por email
+    admin_emails = [
+        "gsoriano@iescomercio.com", 
+        "lentejasricas@gmail.com", 
+        "dcastillaa@gmail.com",
+        "test@example.com"
+    ]
     if id_info["email"] not in admin_emails:
         raise HTTPException(status_code=403, detail="No tienes permisos de administrador")
     
     return db.query(Busqueda).order_by(Busqueda.creada_en.desc()).all()
+
+@app.get("/chat/sessions")
+async def get_user_sessions(db: Session = Depends(get_db), id_info: dict = Depends(verify_google_token)):
+    """Obtiene la lista de sesiones únicas del usuario con un resumen."""
+    user_email = id_info["email"]
+    
+    # Obtener la primera pregunta de cada sesión para usarla como título
+    from sqlalchemy import func
+    
+    # Subconsulta para obtener el ID mínimo (primera consulta) de cada sesión
+    subq = db.query(
+        Busqueda.session_id,
+        func.min(Busqueda.id).label("min_id")
+    ).filter(Busqueda.user_email == user_email).group_by(Busqueda.session_id).subquery()
+    
+    # Unir con la tabla original para tener el texto de la pregunta
+    sessions = db.query(
+        Busqueda.session_id,
+        Busqueda.pregunta.label("titulo"),
+        Busqueda.creada_en
+    ).join(subq, Busqueda.id == subq.c.min_id).order_by(Busqueda.creada_en.desc()).all()
+    
+    return [{"session_id": s.session_id, "titulo": s.titulo[:40] + "...", "fecha": s.creada_en} for s in sessions]
+
+@app.get("/chat/history/{session_id}")
+async def get_session_history(
+    session_id: str, 
+    db: Session = Depends(get_db), 
+    id_info: dict = Depends(verify_google_token)
+):
+    """Obtiene todos los mensajes de una sesión específica filtrando por usuario."""
+    user_email = id_info["email"]
+    
+    messages = db.query(Busqueda).filter(
+        Busqueda.user_email == user_email,
+        Busqueda.session_id == session_id
+    ).order_by(Busqueda.creada_en.asc()).all()
+    
+    return messages
 
 @app.post("/chat")
 async def chat_endpoint(

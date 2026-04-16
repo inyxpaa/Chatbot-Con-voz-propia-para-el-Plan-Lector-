@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
-import { Table, Search, ShieldCheck, ArrowLeft, Loader2 } from "lucide-react";
+import { Table, Search, ShieldCheck, ArrowLeft, Loader2, Users, MessageCircle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 const AdminPanel = ({ token, user }) => {
@@ -17,59 +17,56 @@ const AdminPanel = ({ token, user }) => {
     try {
       setLoading(true);
       const backendUrl = import.meta.env.VITE_BACKEND_URL || window.location.origin;
-      const response = await axios.get(`${backendUrl}/admin/history`, {
+      const response = await axios.get(`${backendUrl.replace(/\/$/, "")}/admin/history`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setQueries(response.data);
       setLoading(false);
     } catch (err) {
-      console.error("Error fetching history:", err);
-      setError(err.response?.data?.detail || "No tienes permiso para ver esta sección.");
+      setError(err.response?.data?.detail || "Sin permisos.");
       setLoading(false);
     }
   };
 
   if (loading) return (
-    <div className="admin-loading">
-      <Loader2 className="spinner" />
-      <p>Cargando historial de consultas...</p>
-    </div>
-  );
-
-  if (error) return (
-    <div className="admin-error">
-      <ShieldCheck size={48} color="red" />
-      <h2>Acceso Denegado</h2>
-      <p>{error}</p>
-      <button onClick={() => navigate("/")} className="back-btn">
-        <ArrowLeft size={16} /> Volver al Chat
-      </button>
+    <div className="login-container">
+      <div className="admin-loading" style={{textAlign: 'center'}}>
+        <Loader2 className="spinner" size={48} style={{color: '#6366f1', marginBottom: '1rem'}} />
+        <p>Cargando auditoría...</p>
+      </div>
     </div>
   );
 
   return (
-    <div className="admin-container">
+    <div className="admin-container" style={{maxWidth: '1200px', margin: '0 auto', padding: '2rem'}}>
       <header className="admin-header">
-        <div className="admin-title">
-          <ShieldCheck className="admin-icon" />
-          <h1>Panel de Administración</h1>
+        <div style={{display: 'flex', alignItems: 'center', gap: '1rem'}}>
+          <ShieldCheck size={32} style={{color: '#6366f1'}} />
+          <div>
+            <h1 style={{fontSize: '1.5rem', fontWeight: 800}}>Panel de Control</h1>
+            <p style={{fontSize: '0.8rem', color: '#94a3b8'}}>Monitorizando {queries.length} interacciones</p>
+          </div>
         </div>
-        <button onClick={() => navigate("/")} className="back-btn-pill">
+        <button onClick={() => navigate("/")} className="new-chat-btn" style={{width: 'auto', padding: '0.5rem 1rem'}}>
           <ArrowLeft size={16} /> Volver al Chat
         </button>
       </header>
 
-      <main className="admin-content">
+      <main>
         <div className="stats-cards">
           <div className="stat-card">
-            <span className="stat-label">Total Consultas</span>
+            <div style={{display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem'}}>
+              <span className="stat-label">Consultas Totales</span>
+              <MessageCircle size={16} color="#6366f1" />
+            </div>
             <span className="stat-value">{queries.length}</span>
           </div>
           <div className="stat-card">
-            <span className="stat-label">Usuarios Únicos</span>
-            <span className="stat-value">
-              {new Set(queries.map(q => q.user_email)).size}
-            </span>
+            <div style={{display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem'}}>
+              <span className="stat-label">Usuarios Activos</span>
+              <Users size={16} color="#6366f1" />
+            </div>
+            <span className="stat-value">{new Set(queries.map(q => q.user_email)).size}</span>
           </div>
         </div>
 
@@ -81,24 +78,19 @@ const AdminPanel = ({ token, user }) => {
                 <th>Usuario</th>
                 <th>Pregunta</th>
                 <th>Respuesta</th>
-                <th>Tiempo (ms)</th>
+                <th>Tiempo</th>
               </tr>
             </thead>
             <tbody>
               {queries.map((q) => (
                 <tr key={q.id}>
-                  <td className="td-date">{new Date(q.creada_en).toLocaleString()}</td>
-                  <td className="td-user">{q.user_email}</td>
-                  <td className="td-text">{q.pregunta}</td>
-                  <td className="td-text">{q.respuesta}</td>
-                  <td className="td-time">{Math.round(q.tiempo_respuesta_ms)}</td>
+                  <td className="td-date">{new Date(q.creada_en).toLocaleDateString()}</td>
+                  <td className="td-user" style={{fontSize: '0.8rem', color: '#6366f1'}}>{q.user_email}</td>
+                  <td className="td-text" title={q.pregunta}>{q.pregunta}</td>
+                  <td className="td-text" title={q.respuesta}>{q.respuesta}</td>
+                  <td className="td-time">{Math.round(q.tiempo_respuesta_ms)}ms</td>
                 </tr>
               ))}
-              {queries.length === 0 && (
-                <tr>
-                  <td colSpan="5" className="td-empty">No hay registros de consultas.</td>
-                </tr>
-              )}
             </tbody>
           </table>
         </div>
