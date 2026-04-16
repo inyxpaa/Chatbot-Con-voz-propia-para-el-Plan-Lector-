@@ -18,8 +18,9 @@ from database import SessionLocal, create_tables, Busqueda, User
 
 # Configuración
 GOOGLE_CLIENT_ID = "22015513342-rp17v8jccio7gvnhkdma2vpigerrnu44.apps.googleusercontent.com"
-HF_MODEL_ID = "inyxpa/chatbot"
-HF_API_URL = f"https://api-inference.huggingface.co/models/{HF_MODEL_ID}"
+HF_MODEL_ID = "Qwen/Qwen2.5-1.5B-Instruct" 
+HF_ADAPTER_ID = "inyxpa/chatbot"
+HF_API_URL = "https://api-inference.huggingface.co/v1/chat/completions" # OpenAI-compatible endpoint
 HF_TOKEN = os.getenv("HF_TOKEN", "")
 
 create_tables()
@@ -73,22 +74,36 @@ def query_hf_model(prompt: str) -> str:
     if not HF_TOKEN:
         return "Respuesta (MODO OFFLINE): El modelo no está configurado (HF_TOKEN falta)."
     
-    headers = {"Authorization": f"Bearer {HF_TOKEN}"}
+    headers = {
+        "Authorization": f"Bearer {HF_TOKEN}",
+        "Content-Type": "application/json"
+    }
+    
     payload = {
-        "inputs": f"<|im_start|>system\nEres un asistente experto en el Plan Lector del centro. Ayudas a los alumnos con dudas sobre libros y lecturas.<|im_end|>\n<|im_start|>user\n{prompt}<|im_end|>\n<|im_start|>assistant\n",
-        "parameters": {"max_new_tokens": 512, "temperature": 0.7}
+        "model": HF_MODEL_ID,
+        "messages": [
+            {"role": "system", "content": "Eres un asistente experto en el Plan Lector del centro. Ayudas a los alumnos con dudas sobre libros y lecturas."},
+            {"role": "user", "content": prompt}
+        ],
+        "adapter_id": HF_ADAPTER_ID,
+        "max_tokens": 512,
+        "temperature": 0.7,
+        "stream": False
     }
     
     try:
         response = requests.post(HF_API_URL, headers=headers, json=payload, timeout=15)
-        res_json = response.json()
-        if isinstance(res_json, list) and len(res_json) > 0:
-            full_text = res_json[0].get("generated_text", "")
-            # Limpiar la respuesta para quedarnos solo con lo que dice el asistente
-            if "assistant\n" in full_text:
-                return full_text.split("assistant\n")[-1].strip()
-            return full_text
-        return "No pude obtener una respuesta del modelo en este momento."
+        if response.status_code != 200:
+            print(f"HF API returned {response.status_code}: {response.text}")
+            return "El asistente está descansando ahora mismo (modelo dormido o error en API)."
+        
+        try:
+            res_json = response.json()
+            return res_json["choices"][0]["message"]["content"].strip()
+        except (KeyError, IndexError, ValueError) as e:
+            print(f"Error parsing HF response: {e} | Response: {response.text[:200]}")
+            return "Recibí una respuesta extraña de mi cerebro. ¿Puedes preguntar de nuevo?"
+            
     except Exception as e:
         print(f"Error calling HF API: {e}")
         return "Hubo un error al conectar con el cerebro del asistente."
@@ -141,15 +156,19 @@ async def chat_endpoint(
     tiempo_ms = (time.perf_counter() - inicio) * 1000
 
     # 3. Registrar en PostgreSQL (tabla busquedas)
-    db.add(Busqueda(
-        user_email=user_email,
-        session_id=query.session_id,
-        pregunta=pregunta,
-        respuesta=respuesta,
-        fuentes=json.dumps(fuentes),
-        bloqueada=False,
-        tiempo_respuesta_ms=tiempo_ms,
-    ))
-    db.commit()
+    try:
+        db.add(Busqueda(
+            user_email=user_email,
+            session_id=query.session_id,
+            pregunta=pregunta,
+            respuesta=respuesta,
+            fuentes=json.dumps(fuentes),
+            bloqueada=False,
+            tiempo_respuesta_ms=tiempo_ms,
+        ))
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        print(f"FATAL: Error al guardar en Postgres: {e}")
 
     return ChatResponse(respuesta=respuesta, fuentes=fuentes)
