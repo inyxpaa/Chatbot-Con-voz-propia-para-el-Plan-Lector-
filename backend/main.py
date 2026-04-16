@@ -4,11 +4,14 @@ import sys
 import json
 import time
 import datetime
-import traceback
-import psutil
 from pathlib import Path
 
 import requests
+import torch
+import psutil
+import traceback
+from transformers import AutoModelForCausalLM, AutoTokenizer
+from peft import PeftModel
 from fastapi import FastAPI, Depends, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
@@ -126,10 +129,6 @@ async def startup_event():
     
     print("Iniciando carga del modelo local...")
     try:
-        import torch
-        from transformers import AutoModelForCausalLM, AutoTokenizer
-        from peft import PeftModel
-        
         # Cargar Tokenizer
         assistant_tokenizer = AutoTokenizer.from_pretrained(HF_MODEL_ID)
         
