@@ -4,6 +4,8 @@ import sys
 import json
 import time
 import datetime
+import traceback
+import psutil
 from pathlib import Path
 
 import requests
@@ -81,6 +83,10 @@ def query_local_model(prompt: str) -> str:
         return "El cerebro del asistente aún se está cargando o no se pudo cargar. Prueba en unos segundos."
         
     try:
+        # Check memory before starting
+        mem = psutil.virtual_memory()
+        print(f"Generando respuesta... Memoria disponible: {mem.available / (1024**2):.2f} MB")
+
         messages = [
             {"role": "system", "content": "Eres un asistente experto en el Plan Lector del centro. Ayudas a los alumnos con dudas sobre libros y lecturas."},
             {"role": "user", "content": prompt}
@@ -93,22 +99,25 @@ def query_local_model(prompt: str) -> str:
             return_tensors="pt"
         ).to("cpu")
         
-        # Generar
-        outputs = assistant_model.generate(
-            input_ids, 
-            max_new_tokens=512, 
-            do_sample=True, 
-            temperature=0.7,
-            pad_token_id=assistant_tokenizer.eos_token_id
-        )
+        # Generar (limitar el tamaño para evitar OOM si es necesario)
+        with torch.no_grad():
+            outputs = assistant_model.generate(
+                input_ids, 
+                max_new_tokens=256, # Reducido de 512 para probar estabilidad
+                do_sample=True, 
+                temperature=0.7,
+                pad_token_id=assistant_tokenizer.eos_token_id,
+                device_map="cpu" # Asegurar explícitamente CPU
+            )
         
         # Omitir los tokens de entrada de la respuesta
         decoded = assistant_tokenizer.decode(outputs[0][input_ids.shape[-1]:], skip_special_tokens=True)
         return decoded.strip()
             
     except Exception as e:
-        print(f"Error en inferencia local: {e}")
-        return "Hubo un error al procesar tu duda localmente. Inténtalo de nuevo."
+        print(f"Error en inferencia local:")
+        print(traceback.format_exc())
+        return f"Hubo un error al procesar tu duda localmente: {str(e)}"
 
 @app.on_event("startup")
 async def startup_event():
@@ -136,10 +145,12 @@ async def startup_event():
         # Cargar el adaptador LoRA
         print(f"Cargando adaptador {HF_ADAPTER_ID}...")
         assistant_model = PeftModel.from_pretrained(base_model, HF_ADAPTER_ID)
+        assistant_model.eval() # Poner en modo evaluación
         
         print("¡Modelo cargado y listo para usar localmente!")
-    except Exception as e:
-        print(f"FATAL: No se pudo cargar el modelo local al inicio: {e}")
+    except Exception:
+        print(f"FATAL: No se pudo cargar el modelo local al inicio:")
+        print(traceback.format_exc())
 
 
 
