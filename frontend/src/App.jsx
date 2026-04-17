@@ -1,3 +1,5 @@
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { Routes, Route, Navigate, useNavigate, Link } from "react-router-dom";
 import { LogOut, Shield, MessageSquare, Loader2, Trash2, Settings, Moon, Sun, Languages, Send } from "lucide-react";
 import LoginPage from "./LoginPage";
 import AdminPanel from "./AdminPanel";
