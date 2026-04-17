@@ -44,3 +44,30 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+
+  deploy:
+    name: Deploy to EC2
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v0.1.10
+        with:
+          host: ${{ secrets.EC2_HOST_BACKEND }}
+          username: ${{ secrets.EC2_USERNAME }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            # Pull the latest image
+            sudo docker pull ${{ secrets.DOCKERHUB_USERNAME }}/planlector-backend:latest
+            
+            # Stop and remove existing container if it exists
+            sudo docker stop backend-app || true
+            sudo docker rm backend-app || true
+            
+            # Run the new container with restart policy
+            sudo docker run -d \
+              --name backend-app \
+              --restart always \
+              -p 8000:8000 \
+              -v /home/ubuntu/data:/app/data \
+              ${{ secrets.DOCKERHUB_USERNAME }}/planlector-backend:latest
