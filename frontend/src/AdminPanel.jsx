@@ -3,11 +3,14 @@ import axios from "axios";
 import { Table, Search, ShieldCheck, ArrowLeft, Loader2, Users, MessageCircle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
-const AdminPanel = ({ token, user }) => {
+import translations from "./translations";
+
+const AdminPanel = ({ token, user, language = "es" }) => {
   const [queries, setQueries] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const navigate = useNavigate();
+  const t = translations[language];
 
   useEffect(() => {
     fetchHistory();
@@ -38,17 +41,19 @@ const AdminPanel = ({ token, user }) => {
   );
 
   return (
-    <div className="admin-container" style={{maxWidth: '1200px', margin: '0 auto', padding: '2rem'}}>
+    <div className="admin-container">
       <header className="admin-header">
         <div style={{display: 'flex', alignItems: 'center', gap: '1rem'}}>
-          <ShieldCheck size={32} style={{color: '#6366f1'}} />
+          <ShieldCheck size={32} style={{color: 'var(--primary)'}} />
           <div>
-            <h1 style={{fontSize: '1.5rem', fontWeight: 800}}>Panel de Control</h1>
-            <p style={{fontSize: '0.8rem', color: '#94a3b8'}}>Monitorizando {queries.length} interacciones</p>
+            <h1 style={{fontSize: '1.5rem', fontWeight: 800}}>{t.admin_panel}</h1>
+            <p style={{fontSize: '0.8rem', color: 'var(--text-muted)'}}>
+              {language === 'es' ? `Monitorizando ${queries.length} interacciones` : `Monitoring ${queries.length} interactions`}
+            </p>
           </div>
         </div>
         <button onClick={() => navigate("/")} className="new-chat-btn" style={{width: 'auto', padding: '0.5rem 1rem'}}>
-          <ArrowLeft size={16} /> Volver al Chat
+          <ArrowLeft size={16} /> {t.back}
         </button>
       </header>
 
@@ -56,15 +61,15 @@ const AdminPanel = ({ token, user }) => {
         <div className="stats-cards">
           <div className="stat-card">
             <div style={{display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem'}}>
-              <span className="stat-label">Consultas Totales</span>
-              <MessageCircle size={16} color="#6366f1" />
+              <span className="stat-label">{language === 'es' ? 'Consultas Totales' : 'Total Queries'}</span>
+              <MessageCircle size={16} color="var(--primary)" />
             </div>
             <span className="stat-value">{queries.length}</span>
           </div>
           <div className="stat-card">
             <div style={{display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem'}}>
-              <span className="stat-label">Usuarios Activos</span>
-              <Users size={16} color="#6366f1" />
+              <span className="stat-label">{language === 'es' ? 'Usuarios Activos' : 'Active Users'}</span>
+              <Users size={16} color="var(--primary)" />
             </div>
             <span className="stat-value">{new Set(queries.map(q => q.user_email)).size}</span>
           </div>
@@ -74,18 +79,18 @@ const AdminPanel = ({ token, user }) => {
           <table className="queries-table">
             <thead>
               <tr>
-                <th>Fecha</th>
-                <th>Usuario</th>
-                <th>Pregunta</th>
-                <th>Respuesta</th>
-                <th>Tiempo</th>
+                <th>{language === 'es' ? 'Fecha' : 'Date'}</th>
+                <th>{language === 'es' ? 'Usuario' : 'User'}</th>
+                <th>{language === 'es' ? 'Pregunta' : 'Question'}</th>
+                <th>{language === 'es' ? 'Respuesta' : 'Answer'}</th>
+                <th>{language === 'es' ? 'Tiempo' : 'Time'}</th>
               </tr>
             </thead>
             <tbody>
               {queries.map((q) => (
                 <tr key={q.id}>
-                  <td className="td-date">{new Date(q.creada_en).toLocaleDateString()}</td>
-                  <td className="td-user" style={{fontSize: '0.8rem', color: '#6366f1'}}>{q.user_email}</td>
+                  <td className="td-date">{new Date(q.creada_en).toLocaleDateString(language === 'es' ? 'es-ES' : 'en-US')}</td>
+                  <td className="td-user" style={{fontSize: '0.8rem', color: 'var(--primary)'}}>{q.user_email}</td>
                   <td className="td-text" title={q.pregunta}>{q.pregunta}</td>
                   <td className="td-text" title={q.respuesta}>{q.respuesta}</td>
                   <td className="td-time">{Math.round(q.tiempo_respuesta_ms)}ms</td>

@@ -1,12 +1,13 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Routes, Route, Navigate, useNavigate, Link } from "react-router-dom";
-import { LogOut, Shield, MessageSquare, Loader2 } from "lucide-react";
+import { LogOut, Shield, MessageSquare, Loader2, Trash2, Settings, Moon, Sun, Languages, Send } from "lucide-react";
 import LoginPage from "./LoginPage";
 import AdminPanel from "./AdminPanel";
+import translations from "./translations";
 
 const CLAVE_STORAGE_SESION = "chat_session_id";
 const CLAVE_STORAGE_TOKEN = "google_auth_token";
 const CLAVE_STORAGE_USER = "google_auth_user";
+const CLAVE_STORAGE_THEME = "chat_theme";
+const CLAVE_STORAGE_LANG = "chat_language";
 
 // --- Helpers ---
 function asegurarIdSesion() {
@@ -22,20 +23,22 @@ function urlEndpoint(path = "/chat") {
   return `${apiBase.replace(/\/$/, "")}${path}`;
 }
 
-function formatearHora(d = new Date()) {
-  return new Intl.DateTimeFormat("es-ES", { hour: "2-digit", minute: "2-digit" }).format(d);
+function formatearHora(d = new Date(), lang = "es") {
+  return new Intl.DateTimeFormat(lang === "es" ? "es-ES" : "en-US", { hour: "2-digit", minute: "2-digit" }).format(d);
 }
 
 // --- Componente Chat Principal ---
-const Chat = ({ token, user, onLogout }) => {
+const Chat = ({ token, user, onLogout, language, setLanguage, theme, setTheme }) => {
   const [idSesion, setIdSesion] = useState(asegurarIdSesion());
   const [ocupado, setOcupado] = useState(false);
   const [entrada, setEntrada] = useState("");
   const [sesiones, setSesiones] = useState([]);
   const [mensajes, setMensajes] = useState([]);
+  const [showSettings, setShowSettings] = useState(false);
 
   const listaRef = useRef(null);
   const navigate = useNavigate();
+  const t = translations[language];
 
   // Cargar sesiones al inicio
   useEffect(() => {
@@ -65,13 +68,13 @@ const Chat = ({ token, user, onLogout }) => {
       if (resp.ok) {
         const data = await resp.json();
         const msgMapeados = data.map(m => ([
-          { id: m.id + "-q", role: "user", text: m.pregunta, time: formatearHora(new Date(m.creada_en)) },
-          { id: m.id + "-a", role: "bot", text: m.respuesta, fuentes: JSON.parse(m.fuentes || "[]"), time: formatearHora(new Date(m.creada_en)) }
+          { id: m.id + "-q", role: "user", text: m.pregunta, time: formatearHora(new Date(m.creada_en), language) },
+          { id: m.id + "-a", role: "bot", text: m.respuesta, fuentes: JSON.parse(m.fuentes || "[]"), time: formatearHora(new Date(m.creada_en), language) }
         ])).flat();
         
         if (msgMapeados.length === 0) {
           setMensajes([{
-            id: "welcome", role: "bot", text: `Hola ${user.name.split(' ')[0]}. ¿En qué puedo ayudarte hoy?`, time: formatearHora()
+            id: "welcome", role: "bot", text: t.welcome.replace("{{name}}", user.name.split(' ')[0]), time: formatearHora(new Date(), language)
           }]);
         } else {
           setMensajes(msgMapeados);
@@ -81,12 +84,29 @@ const Chat = ({ token, user, onLogout }) => {
     finally { setOcupado(false); }
   };
 
+  const borrarSesion = async (sid, e) => {
+    e.stopPropagation();
+    if (!window.confirm(t.confirm_delete)) return;
+    try {
+      const resp = await fetch(urlEndpoint(`/chat/session/${sid}`), {
+        method: 'DELETE',
+        headers: { "Authorization": `Bearer ${token}` }
+      });
+      if (resp.ok) {
+        if (sid === idSesion) {
+          nuevoChat();
+        }
+        fetchSesiones();
+      }
+    } catch (e) { console.error("Error deleting session", e); }
+  };
+
   const nuevoChat = () => {
     const nuevoId = crypto.randomUUID?.() || Math.random().toString(36).substring(2);
     sessionStorage.setItem(CLAVE_STORAGE_SESION, nuevoId);
     setIdSesion(nuevoId);
     setMensajes([{
-      id: "welcome-" + Date.now(), role: "bot", text: "Nueva conversación iniciada. ¿Qué libro te interesa?", time: formatearHora()
+      id: "welcome-" + Date.now(), role: "bot", text: t.new_conv, time: formatearHora(new Date(), language)
     }]);
   };
 
@@ -106,7 +126,7 @@ const Chat = ({ token, user, onLogout }) => {
     const textoLimpio = texto.trim();
     if (!textoLimpio) return;
 
-    setMensajes((prev) => [...prev, { id: Date.now() + "-u", role: "user", text: textoLimpio, time: formatearHora() }]);
+    setMensajes((prev) => [...prev, { id: Date.now() + "-u", role: "user", text: textoLimpio, time: formatearHora(new Date(), language) }]);
     setOcupado(true);
     setEntrada("");
 
@@ -114,15 +134,15 @@ const Chat = ({ token, user, onLogout }) => {
       const resp = await fetch(urlEndpoint("/chat"), {
         method: "POST",
         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
-        body: JSON.stringify({ mensaje: textoLimpio, session_id: idSesion }),
+        body: JSON.stringify({ mensaje: textoLimpio, session_id: idSesion, idioma: language }),
       });
 
       if (!resp.ok) throw new Error("Error en el servidor.");
       const data = await resp.json();
-      setMensajes((prev) => [...prev, { id: Date.now() + "-b", role: "bot", text: data.respuesta, fuentes: data.fuentes || [], time: formatearHora() }]);
+      setMensajes((prev) => [...prev, { id: Date.now() + "-b", role: "bot", text: data.respuesta, fuentes: data.fuentes || [], time: formatearHora(new Date(), language) }]);
       fetchSesiones(); // Actualizar lista lateral
     } catch (e) {
-      setMensajes((prev) => [...prev, { id: Date.now() + "-e", role: "bot", text: "Error de conexión. Reintenta.", isError: true, time: formatearHora() }]);
+      setMensajes((prev) => [...prev, { id: Date.now() + "-e", role: "bot", text: t.error_conn, isError: true, time: formatearHora(new Date(), language) }]);
     } finally { setOcupado(false); }
   };
 
@@ -138,30 +158,36 @@ const Chat = ({ token, user, onLogout }) => {
       <aside className="sidebar">
         <div className="sidebar-header">
            <button className="new-chat-btn" onClick={nuevoChat}>
-             <MessageSquare size={18} /> Nuevo Chat
+             <MessageSquare size={18} /> {t.new_chat}
            </button>
         </div>
         <div className="history-list">
-           <p style={{padding: '0.5rem', fontSize: '0.7rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 700}}>Recientes</p>
+           <p style={{padding: '0.5rem', fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700}}>{t.recent}</p>
+           {sesiones.length === 0 && <p style={{padding: '1rem', fontSize: '0.8rem', color: 'var(--text-muted)'}}>{t.no_sessions}</p>}
            {sesiones.map(s => (
              <div 
                key={s.session_id} 
                className={`history-item ${idSesion === s.session_id ? 'active' : ''}`}
                onClick={() => seleccionarSesion(s.session_id)}
              >
-               <MessageSquare size={14} />
-               <span style={{overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'}}>
-                 {s.titulo}
-               </span>
+               <div style={{display: 'flex', alignItems: 'center', gap: '0.75rem', overflow: 'hidden'}}>
+                 <MessageSquare size={14} />
+                 <span style={{overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'}}>
+                   {s.titulo || t.session_title}
+                 </span>
+               </div>
+               <button className="delete-btn" onClick={(e) => borrarSesion(s.session_id, e)}>
+                 <Trash2 size={14} />
+               </button>
              </div>
            ))}
         </div>
         <div className="sidebar-footer">
-           <div className="user-info-mini" style={{display: 'flex', alignItems: 'center', gap: '0.5rem'}}>
-              <img src={user.picture} alt="" style={{width: 32, height: 32, borderRadius: '50%'}} referrerPolicy="no-referrer" />
+           <div className="user-info-mini" style={{display: 'flex', alignItems: 'center', gap: '0.8rem'}}>
+              <img src={user.picture} alt="" style={{width: 38, height: 38, borderRadius: '50%', border: '2px solid var(--primary)'}} referrerPolicy="no-referrer" />
               <div style={{overflow: 'hidden'}}>
-                <p style={{fontSize: '0.8rem', fontWeight: 600, color: 'white', overflow: 'hidden', textOverflow: 'ellipsis'}}>{user.name}</p>
-                <p style={{fontSize: '0.7rem', color: '#94a3b8'}}>{user.email}</p>
+                <p style={{fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-main)', overflow: 'hidden', textOverflow: 'ellipsis'}}>{user.name}</p>
+                <p style={{fontSize: '0.75rem', color: 'var(--text-muted)'}}>{user.email}</p>
               </div>
            </div>
         </div>
@@ -171,16 +197,43 @@ const Chat = ({ token, user, onLogout }) => {
         <header className="chatbot-header">
           <h1 className="chatbot-title">Plan Lector AI</h1>
           <div className="header-actions">
+            <button onClick={() => setShowSettings(!showSettings)} className="icon-btn" title={t.settings}>
+              <Settings size={20} />
+            </button>
             {isAdmin && (
-              <button onClick={() => navigate("/admin")} className="icon-btn" title="Panel Admin">
+              <button onClick={() => navigate("/admin")} className="icon-btn" title={t.admin_panel}>
                 <Shield size={20} />
               </button>
             )}
-            <button onClick={onLogout} className="icon-btn" title="Cerrar Sesión">
+            <button onClick={onLogout} className="icon-btn" title={t.logout}>
               <LogOut size={20} />
             </button>
           </div>
         </header>
+
+        {showSettings && (
+          <div className="settings-menu">
+            <div className="settings-group">
+              <span className="settings-label">{t.language}</span>
+              <div className="toggle-group">
+                <button className={`toggle-btn ${language === 'es' ? 'active' : ''}`} onClick={() => setLanguage('es')}>ES</button>
+                <button className={`toggle-btn ${language === 'en' ? 'active' : ''}`} onClick={() => setLanguage('en')}>EN</button>
+              </div>
+            </div>
+            <div className="settings-group">
+              <span className="settings-label">{t.theme}</span>
+              <div className="toggle-group">
+                <button className={`toggle-btn ${theme === 'dark' ? 'active' : ''}`} onClick={() => setTheme('dark')}>
+                  <Moon size={14} /> {t.dark}
+                </button>
+                <button className={`toggle-btn ${theme === 'light' ? 'active' : ''}`} onClick={() => setTheme('light')}>
+                  <Sun size={14} /> {t.light}
+                </button>
+              </div>
+            </div>
+            <button className="new-chat-btn" onClick={() => setShowSettings(false)}>{t.back}</button>
+          </div>
+        )}
 
         <section ref={listaRef} className="chatbot-messages">
           {mensajes.map((m) => (
@@ -200,22 +253,22 @@ const Chat = ({ token, user, onLogout }) => {
               </div>
             </div>
           ))}
-          {ocupado && <div className="typing-indicator" style={{padding: '1rem', color: '#6366f1'}}>Pensando...</div>}
+           {ocupado && <div className="typing-indicator">{t.thinking}</div>}
         </section>
 
         <form className="chatbot-form" onSubmit={(e) => { e.preventDefault(); enviarMensaje(entrada); }} autoComplete="off">
           <div className="chatbot-inputRow">
-            <input
+             <input
               className="chatbot-input"
               type="text"
-              placeholder="Pregunta sobre libros del Plan Lector..."
+              placeholder={t.placeholder}
               required
               value={entrada}
               onChange={(e) => setEntrada(e.target.value)}
               disabled={ocupado}
             />
             <button className="chatbot-send" type="submit" disabled={ocupado}>
-              <MessageSquare size={18} />
+              <Send size={20} />
             </button>
           </div>
         </form>
@@ -228,6 +281,17 @@ const Chat = ({ token, user, onLogout }) => {
 export default function App() {
   const [token, setToken] = useState(localStorage.getItem(CLAVE_STORAGE_TOKEN));
   const [user, setUser] = useState(JSON.parse(localStorage.getItem(CLAVE_STORAGE_USER) || "null"));
+  const [theme, setTheme] = useState(localStorage.getItem(CLAVE_STORAGE_THEME) || "dark");
+  const [language, setLanguage] = useState(localStorage.getItem(CLAVE_STORAGE_LANG) || "es");
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem(CLAVE_STORAGE_THEME, theme);
+  }, [theme]);
+
+  useEffect(() => {
+    localStorage.setItem(CLAVE_STORAGE_LANG, language);
+  }, [language]);
 
   const handleLoginSuccess = (response) => {
     const jwtToken = response.credential;
@@ -257,7 +321,15 @@ export default function App() {
 
   return (
     <Routes>
-      <Route path="/" element={<Chat token={token} user={user} onLogout={handleLogout} />} />
+      <Route path="/" element={<Chat 
+        token={token} 
+        user={user} 
+        onLogout={handleLogout} 
+        language={language}
+        setLanguage={setLanguage}
+        theme={theme}
+        setTheme={setTheme}
+      />} />
       <Route path="/admin" element={<AdminPanel token={token} user={user} />} />
       <Route path="*" element={<Navigate to="/" />} />
     </Routes>

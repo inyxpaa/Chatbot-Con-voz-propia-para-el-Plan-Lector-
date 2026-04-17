@@ -47,6 +47,7 @@ app.add_middleware(
 class ChatQuery(BaseModel):
     mensaje: str
     session_id: str | None = None
+    idioma: str | None = "es"
 
 
 class ChatResponse(BaseModel):
@@ -78,24 +79,28 @@ def verify_google_token(authorization: str = Header(None)) -> dict:
         print(f"Error validando token: {e}")
         raise HTTPException(status_code=401, detail="Token de Google inválido")
 
-def query_local_model(prompt: str) -> str:
+def query_local_model(prompt: str, idioma: str = "es") -> str:
     """Genera respuesta usando el modelo cargado en memoria local."""
     global assistant_model, assistant_tokenizer
     
     if assistant_model is None or assistant_tokenizer is None:
-        return "El cerebro del asistente aún se está cargando o no se pudo cargar. Prueba en unos segundos."
+        return "The AI brain is loading..." if idioma == "en" else "El cerebro del asistente aún se está cargando..."
         
     try:
-        # Check memory before starting
         mem = psutil.virtual_memory()
-        print(f"Generando respuesta... Memoria disponible: {mem.available / (1024**2):.2f} MB")
+        print(f"Generando respuesta ({idioma})... Memoria disponible: {mem.available / (1024**2):.2f} MB")
+
+        system_msg = (
+            "You are an expert assistant for the school Reading Plan. You help students with doubts about books and readings. Answer in English."
+            if idioma == "en" else
+            "Eres un asistente experto en el Plan Lector del centro. Ayudas a los alumnos con dudas sobre libros y lecturas. Responde siempre en español."
+        )
 
         messages = [
-            {"role": "system", "content": "Eres un asistente experto en el Plan Lector del centro. Ayudas a los alumnos con dudas sobre libros y lecturas."},
+            {"role": "system", "content": system_msg},
             {"role": "user", "content": prompt}
         ]
         
-        # Aplicar el chat template del modelo
         inputs = assistant_tokenizer.apply_chat_template(
             messages, 
             add_generation_prompt=True, 
@@ -103,26 +108,23 @@ def query_local_model(prompt: str) -> str:
             return_dict=True
         ).to("cpu")
         
-        # Generar (limitar el tamaño para evitar OOM si es necesario)
         with torch.no_grad():
             outputs = assistant_model.generate(
                 inputs["input_ids"],
                 attention_mask=inputs.get("attention_mask"),
-                max_new_tokens=256, # Reducido de 512 para probar estabilidad
+                max_new_tokens=256,
                 do_sample=True, 
                 temperature=0.7,
                 pad_token_id=assistant_tokenizer.eos_token_id
             )
         
-        # Omitir los tokens de entrada de la respuesta
         input_length = inputs["input_ids"].shape[-1]
         decoded = assistant_tokenizer.decode(outputs[0][input_length:], skip_special_tokens=True)
         return decoded.strip()
             
     except Exception as e:
-        print(f"Error en inferencia local:")
         print(traceback.format_exc())
-        return f"Hubo un error al procesar tu duda localmente: {str(e)}"
+        return f"Error: {str(e)}"
 
 @app.on_event("startup")
 async def startup_event():
@@ -213,6 +215,23 @@ async def get_session_history(
     
     return messages
 
+@app.delete("/chat/session/{session_id}")
+async def delete_session(
+    session_id: str, 
+    db: Session = Depends(get_db), 
+    id_info: dict = Depends(verify_google_token)
+):
+    """Borra todos los mensajes de una sesión específica."""
+    user_email = id_info["email"]
+    
+    db.query(Busqueda).filter(
+        Busqueda.user_email == user_email,
+        Busqueda.session_id == session_id
+    ).delete()
+    
+    db.commit()
+    return {"status": "deleted"}
+
 @app.post("/chat")
 async def chat_endpoint(
     query: ChatQuery, 
@@ -235,7 +254,7 @@ async def chat_endpoint(
 
     # 2. Generar respuesta usando el modelo local
     try:
-        respuesta = query_local_model(pregunta)
+        respuesta = query_local_model(pregunta, idioma=query.idioma)
         fuentes = ["IA Local (Qwen 1.5B + Adapter)"]
     except Exception as e:
         print("ERROR EN INFERENCIA LOCAL:", e)
