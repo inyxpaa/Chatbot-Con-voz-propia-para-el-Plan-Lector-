@@ -52,6 +52,9 @@ jobs:
               sudo systemctl start docker
             fi
             
+            # Free up space
+            sudo docker system prune -f
+            
             # Pull latest frontend image
             sudo docker pull ${{ secrets.DOCKERHUB_USERNAME }}/plan-lector-frontend:latest
             
