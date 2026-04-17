@@ -76,10 +76,15 @@ jobs:
             sudo docker stop backend-app || true
             sudo docker rm backend-app || true
             
-            # Run the new container with restart policy
+            # Run the new container with restart policy and necessary environment variables
             sudo docker run -d \
               --name backend-app \
               --restart always \
               -p 8000:8000 \
               -v /home/ubuntu/data:/app/data \
+              -v ~/.cache:/root/.cache \
+              -e CHROMA_DB_PATH=/app/datalake/datalake/artifacts/chroma_db \
+              -e DATABASE_URL=${{ secrets.DATABASE_URL }} \
+              -e MONGODB_URL=${{ secrets.MONGODB_URL }} \
+              -e HF_TOKEN=${{ secrets.HF_TOKEN }} \
               ${{ secrets.DOCKERHUB_USERNAME }}/planlector-backend:latest
