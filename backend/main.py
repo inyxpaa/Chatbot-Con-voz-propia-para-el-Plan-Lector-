@@ -20,6 +20,7 @@ from google.oauth2 import id_token
 from google.auth.transport import requests as google_requests
 
 from database import SessionLocal, create_tables, Busqueda, User
+from modelo.filtro import verificar_consulta
 
 # Configuración
 GOOGLE_CLIENT_ID = "22015513342-rp17v8jccio7gvnhkdma2vpigerrnu44.apps.googleusercontent.com"
@@ -252,7 +253,24 @@ async def chat_endpoint(
         db.add(user)
         db.commit()
 
-    # 2. Generar respuesta usando el modelo local
+    # 2. Moderación de contenido (Filtro de toxicidad)
+    resultado_filtro = verificar_consulta(pregunta)
+    if not resultado_filtro["aceptado"]:
+        # Registrar el bloqueo en Postgres
+        db.add(Busqueda(
+            user_email=user_email,
+            session_id=query.session_id,
+            pregunta=pregunta,
+            respuesta=resultado_filtro["mensaje"],
+            fuentes=json.dumps(["Filtro de Moderación"]),
+            bloqueada=True,
+            categoria_bloqueo=resultado_filtro.get("categoria"),
+            tiempo_respuesta_ms=0,
+        ))
+        db.commit()
+        return ChatResponse(respuesta=resultado_filtro["mensaje"], fuentes=[])
+
+    # 3. Generar respuesta usando el modelo local
     try:
         respuesta = query_local_model(pregunta, idioma=query.idioma)
         fuentes = ["IA Local (Qwen 1.5B + Adapter)"]
@@ -263,7 +281,7 @@ async def chat_endpoint(
 
     tiempo_ms = (time.perf_counter() - inicio) * 1000
 
-    # 3. Registrar en PostgreSQL (tabla busquedas)
+    # 4. Registrar en PostgreSQL (tabla busquedas)
     try:
         db.add(Busqueda(
             user_email=user_email,
