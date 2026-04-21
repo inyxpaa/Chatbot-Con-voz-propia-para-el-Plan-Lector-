@@ -4,6 +4,7 @@ sqlalchemy
 pydantic
 chromadb
 requests
+httpx          # async HTTP client para llamadas no bloqueantes al modelo
 beautifulsoup4
 psycopg2-binary
 pymongo
