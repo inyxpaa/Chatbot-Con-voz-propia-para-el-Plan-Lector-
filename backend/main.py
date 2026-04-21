@@ -6,6 +6,7 @@ import logging
 import hashlib
 import re
 import asyncio
+from functools import lru_cache
 from pathlib import Path
 
 import httpx
@@ -62,11 +63,18 @@ HF_MODEL_ID    = "inyxpa/chatbot"
 HF_TOKEN       = os.getenv("HF_TOKEN", "")
 HF_API_URL     = f"https://api-inference.huggingface.co/models/{HF_MODEL_ID}"
 
-MODEL_PROVIDER  = os.getenv("MODEL_PROVIDER", "hf").lower()
+MODEL_PROVIDER  = os.getenv("MODEL_PROVIDER", "local").lower()
 MODEL_API_URL   = os.getenv("MODEL_API_URL", HF_API_URL)
 MODEL_NAME      = os.getenv("MODEL_NAME", HF_MODEL_ID)
 MAX_NEW_TOKENS  = int(os.getenv("MAX_NEW_TOKENS", "256"))
 MODEL_TIMEOUT_S = int(os.getenv("MODEL_TIMEOUT_S", "60"))
+
+# Ruta al modelo fine-tuneado en disco (solo para MODEL_PROVIDER=local)
+# Default: backend/modelo/entrenamiento/output/qwen_finetuned
+_default_model_path = (
+    Path(__file__).parent / "modelo" / "entrenamiento" / "output" / "qwen_finetuned"
+)
+LOCAL_MODEL_PATH = Path(os.getenv("LOCAL_MODEL_PATH", str(_default_model_path)))
 
 SYSTEM_PROMPT = (
     "Eres un asistente del Plan Lector del IES Comercio. "
@@ -75,11 +83,61 @@ SYSTEM_PROMPT = (
 )
 
 # ---------------------------------------------------------------------------
+# Modelo local — singleton cargado una vez al arrancar
+# ---------------------------------------------------------------------------
+
+_local_pipeline = None  # HuggingFace pipeline (solo para provider=local)
+
+
+def load_local_model():
+    """
+    Carga el modelo fine-tuneado Qwen2.5-QLoRA directamente con transformers.
+
+    Se llama UNA vez al arrancar el servidor. El pipeline queda en memoria
+    para servir todas las peticiones sin overhead de carga.
+
+    Si el modelo no está en disco, registra un warning y el sistema
+    cae en modo degradado (devuelve mensaje de error).
+    """
+    global _local_pipeline
+    if MODEL_PROVIDER != "local":
+        return
+
+    try:
+        # Importar transformers aquí: si el provider no es local, no se carga
+        import torch
+        from transformers import pipeline as hf_pipeline
+
+        if not LOCAL_MODEL_PATH.exists():
+            logger.warning(
+                f"[MODELO] Ruta del modelo no encontrada: {LOCAL_MODEL_PATH}. "
+                "Usando HF cloud como fallback."
+            )
+            return
+
+        device = 0 if torch.cuda.is_available() else -1  # GPU si disponible
+        logger.info(f"[MODELO] Cargando modelo desde {LOCAL_MODEL_PATH} (device={device})...")
+
+        _local_pipeline = hf_pipeline(
+            "text-generation",
+            model=str(LOCAL_MODEL_PATH),
+            device=device,
+            torch_dtype=torch.bfloat16 if torch.cuda.is_available() else torch.float32,
+        )
+        logger.info("[MODELO] Modelo local cargado correctamente en memoria.")
+
+    except Exception as e:
+        logger.error(f"[MODELO] Error al cargar el modelo local: {e}")
+        _local_pipeline = None
+
+
+# ---------------------------------------------------------------------------
 # Inicialización
 # ---------------------------------------------------------------------------
 
 create_tables()
-warmup()  # Precarga ChromaDB al arrancar → elimina latencia del primer request
+warmup()         # Precarga ChromaDB → elimina latencia del primer request
+load_local_model()  # Carga el modelo fine-tuneado en memoria
 
 app = FastAPI(
     title="Chatbot 'Con voz propia' — Plan Lector",
@@ -190,16 +248,42 @@ def verify_google_token(authorization: str = Header(None)) -> dict:
 
 async def query_model_async(prompt: str) -> str:
     """
-    Llama al modelo LLM mediante httpx async.
-
-    Soporta cuatro modos según MODEL_PROVIDER:
-      hf / tgi  → HF Inference API o Text Generation Inference local
-      openai    → API compatible con OpenAI (vLLM, LM Studio, llama.cpp)
-      ollama    → Ollama
-
-    El formato del prompt (ChatML <|im_start|> vs OpenAI messages)
-    se adapta automáticamente.
+    Llama al modelo LLM según MODEL_PROVIDER:
+      local     → modelo fine-tuneado en disco con transformers (DEFAULT en AWS)
+      hf / tgi  → HF Inference API o Text Generation Inference
+      openai    → API compatible con OpenAI (vLLM, LM Studio)
+      ollama    → Ollama local
     """
+    # ── LOCAL: modelo fine-tuneado en disco ─────────────────────────────────
+    if MODEL_PROVIDER == "local":
+        if _local_pipeline is None:
+            logger.error("[MODELO] Pipeline local no disponible. Verifica LOCAL_MODEL_PATH.")
+            return "El modelo no está disponible en este momento. Contacta al administrador."
+
+        # Construir el prompt en formato ChatML (Qwen2.5-Instruct)
+        full_prompt = (
+            f"<|im_start|>system\n{SYSTEM_PROMPT}<|im_end|>\n"
+            f"<|im_start|>user\n{prompt}<|im_end|>\n"
+            f"<|im_start|>assistant\n"
+        )
+        try:
+            # asyncio.to_thread para no bloquear el event loop de FastAPI
+            result = await asyncio.to_thread(
+                _local_pipeline,
+                full_prompt,
+                max_new_tokens=MAX_NEW_TOKENS,
+                temperature=0.7,
+                do_sample=True,
+                return_full_text=False,  # solo la parte generada por el asistente
+            )
+            text = result[0]["generated_text"].strip()
+            # Limpiar token de fin si viene incluido
+            text = text.replace("<|im_end|>", "").strip()
+            return text or "No pude generar una respuesta."
+        except Exception as e:
+            logger.error(f"[MODELO] Error en inferencia local: {e}")
+            return "Hubo un error al generar la respuesta. Inténtalo de nuevo."
+
     headers: dict = {}
     url:     str  = ""
     payload: dict = {}
