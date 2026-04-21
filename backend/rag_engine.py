@@ -5,23 +5,15 @@
   Proyecto : Chatbot Plan Lector
   Tarea    : 2 — Optimización de Latencia y Rendimiento
 
-  Responsabilidades:
-    - Mantener una única conexión a ChromaDB (singleton via
-      lru_cache) para eliminar el overhead de reconexión en
-      cada petición.
-    - Recuperar los fragmentos más relevantes del corpus según
-      la pregunta del usuario (búsqueda vectorial).
-    - Construir el prompt final enriquecido con el contexto
-      recuperado para reducir alucinaciones y mejorar la
-      precisión de las respuestas.
-
-  Uso desde main.py:
-      from rag_engine import retrieve_context, build_rag_prompt
-      contexto, fuentes = retrieve_context(pregunta)
-      prompt = build_rag_prompt(pregunta, contexto)
+  Fixes aplicados:
+    - CHROMA_DB_PATH configurable via env var CHROMA_DB_PATH
+      para que funcione en cualquier ruta dentro de AWS
+    - Singleton robusto: si ChromaDB falla al arrancar, el
+      chatbot degrada gracefully sin crashear
 ==============================================================
 """
 
+import os
 import logging
 from functools import lru_cache
 from pathlib import Path
@@ -34,13 +26,16 @@ import chromadb
 
 logger = logging.getLogger(__name__)
 
-# Ruta al directorio con los datos de ChromaDB (relativa a este archivo)
-CHROMA_DB_PATH = Path(__file__).parent / "datalake" / "artifacts" / "chroma_db"
-COLLECTION_NAME = "convozpropia"
+# La ruta a ChromaDB se puede sobreescribir con variable de entorno.
+# Por defecto busca relativo al propio rag_engine.py (estructura local).
+# En AWS, establecer: CHROMA_DB_PATH=/app/datalake/artifacts/chroma_db
+_default_chroma_path = Path(__file__).parent / "datalake" / "artifacts" / "chroma_db"
+CHROMA_DB_PATH  = Path(os.getenv("CHROMA_DB_PATH", str(_default_chroma_path)))
+COLLECTION_NAME = os.getenv("CHROMA_COLLECTION", "convozpropia")
 
 # Número de fragmentos a recuperar por consulta
 # 3 es el equilibrio óptimo: suficiente contexto, mínima latencia
-N_RESULTS = 3
+N_RESULTS = int(os.getenv("RAG_N_RESULTS", "3"))
 
 
 # ---------------------------------------------------------------------------
@@ -63,14 +58,17 @@ def _get_collection():
         if not CHROMA_DB_PATH.exists():
             logger.warning(
                 f"[RAG] ChromaDB no encontrado en: {CHROMA_DB_PATH}. "
-                "El chatbot funcionará sin contexto RAG."
+                "El chatbot funcionará sin contexto RAG (modo degradado)."
             )
             return None
 
-        client = chromadb.PersistentClient(path=str(CHROMA_DB_PATH))
+        client     = chromadb.PersistentClient(path=str(CHROMA_DB_PATH))
         collection = client.get_collection(name=COLLECTION_NAME)
-        total = collection.count()
-        logger.info(f"[RAG] ChromaDB listo — colección '{COLLECTION_NAME}' con {total} chunks indexados.")
+        total      = collection.count()
+        logger.info(
+            f"[RAG] ChromaDB listo — colección '{COLLECTION_NAME}' "
+            f"con {total} chunks indexados en {CHROMA_DB_PATH}"
+        )
         return collection
 
     except Exception as e:
@@ -86,28 +84,22 @@ def retrieve_context(pregunta: str, n_results: int = N_RESULTS) -> tuple[str, li
     """
     Recupera los fragmentos más relevantes del corpus para una pregunta.
 
-    Proceso:
-      1. Obtiene la colección en memoria (singleton, sin overhead).
-      2. Ejecuta la búsqueda vectorial por similitud semántica.
-      3. Formatea los fragmentos recuperados como contexto legible.
-
-    Args:
-        pregunta  : Consulta del usuario.
-        n_results : Número de fragmentos a recuperar (default: 3).
-
     Returns:
         (contexto_formateado, lista_de_fuentes)
-        Si ChromaDB no está disponible, devuelve ("", []) para
-        modo degradado: el chatbot sigue funcionando sin RAG.
+        Si ChromaDB no está disponible devuelve ("", []) — modo degradado.
     """
     collection = _get_collection()
     if collection is None:
         return "", []
 
     try:
+        count = collection.count()
+        if count == 0:
+            return "", []
+
         results = collection.query(
             query_texts=[pregunta],
-            n_results=min(n_results, collection.count()),
+            n_results=min(n_results, count),
         )
 
         docs = results.get("documents", [[]])[0]
@@ -115,13 +107,9 @@ def retrieve_context(pregunta: str, n_results: int = N_RESULTS) -> tuple[str, li
             logger.debug("[RAG] No se encontraron fragmentos relevantes para la consulta.")
             return "", []
 
-        # Formatear fragmentos recuperados como bloque de contexto
-        partes = []
-        for i, doc in enumerate(docs, start=1):
-            partes.append(f"[Fragmento {i}]:\n{doc.strip()}")
-
+        partes  = [f"[Fragmento {i}]:\n{doc.strip()}" for i, doc in enumerate(docs, start=1)]
         contexto = "\n\n".join(partes)
-        fuentes = [f"RAG:convozpropia:frag_{i}" for i in range(1, len(docs) + 1)]
+        fuentes  = [f"RAG:convozpropia:frag_{i}" for i in range(1, len(docs) + 1)]
 
         logger.debug(f"[RAG] Recuperados {len(docs)} fragmentos relevantes.")
         return contexto, fuentes
@@ -139,48 +127,31 @@ def build_rag_prompt(pregunta: str, contexto: str) -> str:
     """
     Construye el prompt final con el contexto RAG insertado.
 
-    Si hay contexto disponible, instruye al modelo para que base
-    su respuesta en los fragmentos recuperados, reduciendo las
-    alucinaciones y acortando las respuestas (= menor latencia).
-
-    Si no hay contexto, devuelve la pregunta sin modificar para
-    que el modelo responda con su conocimiento base.
-
-    Args:
-        pregunta : Consulta original del usuario.
-        contexto : Fragmentos recuperados de ChromaDB.
-
-    Returns:
-        Prompt listo para enviar al modelo LLM.
+    NOTA: Este método construye SOLO el contenido de usuario/contexto.
+    El system prompt (instrucciones de rol) se inyecta en query_model_async
+    según el formato que requiera cada proveedor (ChatML, OpenAI messages, etc.)
+    para no duplicar instrucciones.
     """
     if contexto:
         return (
-            "Eres un asistente experto en el Plan Lector del centro educativo. "
-            "Responde ÚNICAMENTE basándote en la siguiente información del corpus. "
-            "Si la información no es suficiente, indícalo brevemente.\n\n"
+            "Usa ÚNICAMENTE la siguiente información del Plan Lector para responder. "
+            "Si la información no cubre la pregunta, indícalo brevemente.\n\n"
             f"=== INFORMACIÓN DEL PLAN LECTOR ===\n{contexto}\n"
-            "=== FIN DE LA INFORMACIÓN ===\n\n"
-            f"Pregunta del alumno: {pregunta}\n\n"
-            "Respuesta (concisa y directa):"
+            "=== FIN ===\n\n"
+            f"Pregunta: {pregunta}"
         )
-
     # Degraded mode: sin contexto RAG
-    return (
-        "Eres un asistente experto en el Plan Lector del centro educativo. "
-        "Ayudas a los alumnos con dudas sobre libros y lecturas.\n\n"
-        f"Pregunta: {pregunta}\n\nRespuesta:"
-    )
+    return pregunta
 
 
 # ---------------------------------------------------------------------------
-# Utilidad: warm-up al importar
+# Warm-up
 # ---------------------------------------------------------------------------
 
 def warmup():
     """
-    Precarga la conexión a ChromaDB al arrancar la aplicación.
-    Llámala desde main.py al inicializar la app para eliminar
-    la latencia del primer request (~200-400ms).
+    Precarga la conexión a ChromaDB al arrancar la app.
+    Elimina la latencia extra del primer request.
     """
     logger.info("[RAG] Iniciando warm-up de ChromaDB...")
     _get_collection()
