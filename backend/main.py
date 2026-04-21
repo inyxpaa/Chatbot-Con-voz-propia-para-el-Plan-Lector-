@@ -376,6 +376,86 @@ async def health():
     }
 
 
+@app.get("/chat/sessions")
+async def get_user_sessions(
+    db:      Session = Depends(get_db),
+    id_info: dict    = Depends(verify_google_token),
+):
+    """Lista de sesiones únicas del usuario con el título de su primera pregunta."""
+    user_hash = hash_email(id_info["email"])
+
+    subq = (
+        db.query(Busqueda.session_id, func.min(Busqueda.id).label("min_id"))
+        .filter(Busqueda.user_email == user_hash, Busqueda.session_id.isnot(None))
+        .group_by(Busqueda.session_id)
+        .subquery()
+    )
+
+    sesiones = (
+        db.query(Busqueda.session_id, Busqueda.pregunta.label("titulo"), Busqueda.creada_en)
+        .join(subq, Busqueda.id == subq.c.min_id)
+        .order_by(Busqueda.creada_en.desc())
+        .all()
+    )
+
+    return [
+        {
+            "session_id": s.session_id,
+            "titulo":     (s.titulo or "")[:50] + ("..." if len(s.titulo or "") > 50 else ""),
+            "fecha":      s.creada_en.isoformat() if s.creada_en else None,
+        }
+        for s in sesiones
+    ]
+
+
+@app.get("/chat/history/{session_id}")
+async def get_session_history(
+    session_id: str,
+    db:         Session = Depends(get_db),
+    id_info:    dict    = Depends(verify_google_token),
+):
+    """Mensajes de una sesión específica del usuario autenticado."""
+    user_hash = hash_email(id_info["email"])
+    mensajes  = (
+        db.query(Busqueda)
+        .filter(Busqueda.user_email == user_hash, Busqueda.session_id == session_id)
+        .order_by(Busqueda.creada_en.asc())
+        .all()
+    )
+    return [
+        BusquedaOut(
+            id=r.id,
+            user_email=r.user_email,
+            session_id=r.session_id,
+            pregunta=r.pregunta,
+            respuesta=r.respuesta,
+            fuentes=r.fuentes,
+            bloqueada=bool(r.bloqueada),
+            categoria_bloqueo=r.categoria_bloqueo,
+            tiempo_respuesta_ms=r.tiempo_respuesta_ms,
+            creada_en=r.creada_en.isoformat() if r.creada_en else None,
+        )
+        for r in mensajes
+    ]
+
+
+@app.delete("/chat/session/{session_id}")
+async def delete_session(
+    session_id: str,
+    db:         Session = Depends(get_db),
+    id_info:    dict    = Depends(verify_google_token),
+):
+    """Borra todos los mensajes de una sesión del usuario autenticado."""
+    user_hash = hash_email(id_info["email"])
+    deleted = (
+        db.query(Busqueda)
+        .filter(Busqueda.user_email == user_hash, Busqueda.session_id == session_id)
+        .delete()
+    )
+    db.commit()
+    return {"deleted": deleted}
+
+
 @app.post("/chat", response_model=ChatResponse)
 async def chat_endpoint(
     query:   ChatQuery,
