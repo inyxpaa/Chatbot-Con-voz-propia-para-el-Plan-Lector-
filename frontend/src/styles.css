@@ -234,3 +234,289 @@
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
 }
+
+/* ===================================================================
+   ADMIN PANEL v2 — Tarea 3: Panel de Administración y Observabilidad
+   =================================================================== */
+
+/* Tabs de navegación */
+.admin-tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 2px solid #eee;
+  margin-bottom: 32px;
+  overflow-x: auto;
+}
+
+.admin-tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 20px;
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: none;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  color: #777;
+  white-space: nowrap;
+  margin-bottom: -2px;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.admin-tab:hover { color: #222; }
+
+.admin-tab--active {
+  color: #1db954;
+  border-bottom-color: #1db954;
+  font-weight: 700;
+}
+
+/* Contenido de pestaña */
+.tab-pane { animation: fadeIn 0.2s ease; }
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* KPI extra */
+.stat-sub {
+  display: block;
+  font-size: 12px;
+  color: #999;
+  margin-top: 4px;
+}
+
+/* Gráfico */
+.chart-card {
+  background: #fff;
+  border: 1px solid #eee;
+  border-radius: 16px;
+  padding: 28px 32px;
+  margin-top: 8px;
+}
+
+.chart-wrap {
+  margin-top: 20px;
+  padding: 0 8px;
+}
+
+/* Encabezados de sección */
+.section-title {
+  margin: 0 0 16px;
+  font-size: 16px;
+  font-weight: 700;
+  color: #111;
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.section-header .section-title { margin: 0; }
+
+/* Toolbar del historial */
+.hist-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.search-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 240px;
+}
+
+.search-icon-inner {
+  position: absolute;
+  left: 12px;
+  color: #aaa;
+  pointer-events: none;
+}
+
+.hist-search {
+  width: 100%;
+  padding: 8px 12px 8px 34px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.hist-search:focus { border-color: #1db954; }
+
+.toggle-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: #555;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+/* Botones pequeños */
+.btn-sm {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 7px 14px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  background: #fff;
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s;
+}
+
+.btn-sm:hover:not(:disabled) { background: #f5f5f5; border-color: #bbb; }
+.btn-sm:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.btn-export {
+  background: #1db954;
+  color: #fff;
+  border-color: #1db954;
+  font-weight: 600;
+}
+
+.btn-export:hover:not(:disabled) { background: #17a348; border-color: #17a348; }
+
+/* Contador de registros */
+.hist-count {
+  font-size: 13px;
+  color: #888;
+  margin: 0 0 12px;
+}
+
+/* Filas bloqueadas */
+.row-blocked { background: #fff5f5; }
+
+/* Badges de estado en tabla */
+.badge-ok {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 99px;
+  background: #e6f9ee;
+  color: #1db954;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.badge-blocked {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 99px;
+  background: #fff0f0;
+  color: #e53e3e;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* Hash de usuario */
+.hash-code {
+  font-family: "Courier New", monospace;
+  font-size: 11px;
+  color: #888;
+  background: #f5f5f5;
+  padding: 2px 5px;
+  border-radius: 4px;
+}
+
+/* Paginación */
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin-top: 20px;
+}
+
+.page-btn {
+  padding: 7px 16px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  background: #fff;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.page-btn:hover:not(:disabled) { background: #f5f5f5; }
+.page-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.page-info { font-size: 13px; color: #666; }
+
+/* Health cards — pestaña Sistema */
+.health-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 20px;
+}
+
+.health-card {
+  background: #fff;
+  border: 1px solid #eee;
+  border-radius: 16px;
+  padding: 24px;
+}
+
+.health-title {
+  margin: 0 0 16px;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.health-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 8px 0;
+  border-bottom: 1px solid #f5f5f5;
+  font-size: 13px;
+  gap: 8px;
+}
+
+.health-row:last-child { border-bottom: none; }
+.health-row > span:first-child { color: #777; flex-shrink: 0; }
+
+.path-code {
+  font-family: "Courier New", monospace;
+  font-size: 11px;
+  color: #555;
+  word-break: break-all;
+  text-align: right;
+}
+
+/* Badges de estado sistema */
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 10px;
+  border-radius: 99px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.status-ok  { background: #e6f9ee; color: #1db954; }
+.status-err { background: #fff0f0; color: #e53e3e; }
+
+.refresh-note {
+  font-size: 12px;
+  color: #aaa;
+  margin-top: 16px;
+  text-align: center;
+}
