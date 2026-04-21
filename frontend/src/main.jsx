@@ -7,13 +7,33 @@ import "./styles.css";
 
 const GOOGLE_CLIENT_ID = "22015513342-rp17v8jccio7gvnhkdma2vpigerrnu44.apps.googleusercontent.com";
 
-createRoot(document.getElementById("root")).render(
-  <React.StrictMode>
-    <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
-      <BrowserRouter>
-        <App />
-      </BrowserRouter>
-    </GoogleOAuthProvider>
-  </React.StrictMode>
-);
+// Función para inicializar el chat en cualquier sitio
+const initChatbot = () => {
+  // Buscamos si ya existe el contenedor, si no, lo creamos
+  let container = document.getElementById("chatbot-plan-lector-root");
+  
+  if (!container) {
+    container = document.createElement("div");
+    container.id = "chatbot-plan-lector-root";
+    document.body.appendChild(container);
+  }
 
+  createRoot(container).render(
+    <React.StrictMode>
+      <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
+        {/* Usamos HashRouter en lugar de BrowserRouter para evitar problemas 
+            con las rutas de WordPress */}
+        <BrowserRouter>
+          <App />
+        </BrowserRouter>
+      </GoogleOAuthProvider>
+    </React.StrictMode>
+  );
+};
+
+// Se ejecuta automáticamente al cargar el script
+if (document.readyState === "complete") {
+  initChatbot();
+} else {
+  window.addEventListener("load", initChatbot);
+}

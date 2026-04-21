@@ -3,18 +3,15 @@ import react from "@vitejs/plugin-react";
 
 export default defineConfig({
   plugins: [react()],
-  server: {
-    port: 5173,
-    strictPort: true,
-    proxy: {
-      "/chat": {
-        target: "http://127.0.0.1:8000",
-        changeOrigin: true,
+  build: {
+    // Esto genera un solo archivo JS y CSS sin hashes aleatorios
+    rollupOptions: {
+      output: {
+        manualChunks: undefined,
+        entryFileNames: `assets/chatbot-plan-lector.js`,
+        chunkFileNames: `assets/[name].js`,
+        assetFileNames: `assets/[name].[ext]`,
       },
     },
   },
-  build: {
-
-  },
 });
-

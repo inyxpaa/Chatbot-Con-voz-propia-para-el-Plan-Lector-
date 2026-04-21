@@ -281,10 +281,12 @@ const Chat = ({ token, user, onLogout, language, setLanguage, theme, setTheme })
 
 // --- App Principal con Rutas ---
 export default function App() {
+// CAMBIO TEMPORAL: Fuerza un token y usuario de prueba
   const [token, setToken] = useState(localStorage.getItem(CLAVE_STORAGE_TOKEN));
   const [user, setUser] = useState(JSON.parse(localStorage.getItem(CLAVE_STORAGE_USER) || "null"));
   const [theme, setTheme] = useState(localStorage.getItem(CLAVE_STORAGE_THEME) || "dark");
   const [language, setLanguage] = useState(localStorage.getItem(CLAVE_STORAGE_LANG) || "es");
+  const [isOpen, setIsOpen] = useState(false); 
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
@@ -317,23 +319,83 @@ export default function App() {
     localStorage.removeItem(CLAVE_STORAGE_USER);
   };
 
-  if (!token) {
-    return <LoginPage onLoginSuccess={handleLoginSuccess} />;
+  // --- LÓGICA DE RENDERIZADO DEL WIDGET ---
+
+  // 1. Si el chat está CERRADO: Mostramos solo el botón flotante (Launcher)
+  if (!isOpen) {
+    return (
+      <button 
+        onClick={() => setIsOpen(true)}
+        className="chatbot-launcher-btn"
+        style={{
+          position: 'fixed', bottom: '20px', right: '20px',
+          width: '60px', height: '60px', borderRadius: '50%',
+          backgroundColor: '#007bff', color: 'white', border: 'none',
+          cursor: 'pointer', boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+          zIndex: 9999, display: 'flex', justifyContent: 'center', alignItems: 'center'
+        }}
+      >
+        <MessageSquare size={30} />
+      </button>
+    );
   }
 
+  // 2. Si el chat está ABIERTO: Mostramos la "burbuja" del chat
   return (
-    <Routes>
-      <Route path="/" element={<Chat 
-        token={token} 
-        user={user} 
-        onLogout={handleLogout} 
-        language={language}
-        setLanguage={setLanguage}
-        theme={theme}
-        setTheme={setTheme}
-      />} />
-      <Route path="/admin" element={<AdminPanel token={token} user={user} />} />
-      <Route path="*" element={<Navigate to="/" />} />
-    </Routes>
+    <div className="chatbot-widget-container" data-theme={theme} style={{
+    position: 'fixed', bottom: '90px', right: '20px',
+    width: '400px', height: '600px', zIndex: 9999,
+    boxShadow: '0 8px 24px rgba(0,0,0,0.2)', borderRadius: '12px',
+    overflow: 'hidden', display: 'flex', flexDirection: 'column', // <--- Importante
+    backgroundColor: 'var(--bg-main)', border: '1px solid #ddd'
+  }}>
+    {/* Añadimos un estilo global temporal para arreglar el layout del chat interno */}
+    <style>{`
+        .chatbot-app { 
+            display: flex; 
+            flex-direction: row; 
+            height: 100%; 
+            width: 100%;
+        }
+        /* Ocultamos la sidebar en el widget por ahora para ver el chat */
+        .sidebar { 
+            display: none; 
+        }
+        .chatbot-container { 
+            width: 100% !important; 
+            height: 100%;
+        }
+        /* Ajustamos el tamaño de la fuente para que quepa en 400px */
+        .chatbot-bubble__text { font-size: 0.9rem; }
+    `}</style>
+      {/* Botón X para cerrar */}
+    <button 
+      onClick={() => setIsOpen(false)}
+      style={{ 
+        position: 'absolute', top: '15px', right: '15px', zIndex: 10000, 
+        background: 'rgba(0,0,0,0.1)', border: 'none', borderRadius: '50%',
+        width: '30px', height: '30px', cursor: 'pointer', color: 'var(--text-main)'
+      }}
+    >
+      ✕
+    </button>
+
+      {/* Contenido dinámico dentro del widget */}
+      {!token ? (
+        <LoginPage onLoginSuccess={handleLoginSuccess} />
+      ) : (
+        <Routes>
+          <Route path="/" element={
+            <Chat 
+              token={token} user={user} onLogout={handleLogout} 
+              language={language} setLanguage={setLanguage}
+              theme={theme} setTheme={setTheme}
+            />
+          } />
+          <Route path="/admin" element={<AdminPanel token={token} user={user} />} />
+          <Route path="*" element={<Navigate to="/" />} />
+        </Routes>
+      )}
+    </div>
   );
 }

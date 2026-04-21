@@ -1,105 +1,74 @@
-import React, { useState, useEffect } from "react";
-import axios from "axios";
-import { Table, Search, ShieldCheck, ArrowLeft, Loader2, Users, MessageCircle } from "lucide-react";
+import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { ArrowLeft, ShieldAlert, Users, MessageSquare, Trash2 } from "lucide-react";
 
-import translations from "./translations";
-
-const AdminPanel = ({ token, user, language = "es" }) => {
-  const [queries, setQueries] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+const AdminPanel = ({ token, user }) => {
+  const [stats, setStats] = useState({ total_users: 0, total_interactions: 0, total_red_flags: 0 });
+  const [redFlags, setRedFlags] = useState([]);
   const navigate = useNavigate();
-  const t = translations[language];
+
+  // URL del backend (la misma lógica que en App.jsx)
+  const apiBase = import.meta.env.VITE_BACKEND_URL || window.location.origin;
 
   useEffect(() => {
-    fetchHistory();
+    fetchStats();
+    fetchRedFlags();
   }, []);
 
-  const fetchHistory = async () => {
+  const fetchStats = async () => {
     try {
-      setLoading(true);
-      const backendUrl = import.meta.env.VITE_BACKEND_URL || window.location.origin;
-      const response = await axios.get(`${backendUrl.replace(/\/$/, "")}/admin/history`, {
-        headers: { Authorization: `Bearer ${token}` }
+      const resp = await fetch(`${apiBase}/admin/stats`, {
+        headers: { "Authorization": `Bearer ${token}` }
       });
-      setQueries(response.data);
-      setLoading(false);
-    } catch (err) {
-      setError(err.response?.data?.detail || "Sin permisos.");
-      setLoading(false);
-    }
+      if (resp.ok) setStats(await resp.json());
+    } catch (e) { console.error("Error stats", e); }
   };
 
-  if (loading) return (
-    <div className="login-container">
-      <div className="admin-loading" style={{textAlign: 'center'}}>
-        <Loader2 className="spinner" size={48} style={{color: '#6366f1', marginBottom: '1rem'}} />
-        <p>Cargando auditoría...</p>
-      </div>
-    </div>
-  );
+  const fetchRedFlags = async () => {
+    try {
+      const resp = await fetch(`${apiBase}/admin/red-flags`, {
+        headers: { "Authorization": `Bearer ${token}` }
+      });
+      if (resp.ok) setRedFlags(await resp.json());
+    } catch (e) { console.error("Error flags", e); }
+  };
 
   return (
-    <div className="admin-container">
-      <header className="admin-header">
-        <div style={{display: 'flex', alignItems: 'center', gap: '1rem'}}>
-          <ShieldCheck size={32} style={{color: 'var(--primary)'}} />
-          <div>
-            <h1 style={{fontSize: '1.5rem', fontWeight: 800}}>{t.admin_panel}</h1>
-            <p style={{fontSize: '0.8rem', color: 'var(--text-muted)'}}>
-              {language === 'es' ? `Monitorizando ${queries.length} interacciones` : `Monitoring ${queries.length} interactions`}
-            </p>
-          </div>
-        </div>
-        <button onClick={() => navigate("/")} className="new-chat-btn" style={{width: 'auto', padding: '0.5rem 1rem'}}>
-          <ArrowLeft size={16} /> {t.back}
+    <div className="admin-panel-widget" style={{ display: 'flex', flexDirection: 'column', height: '100%', backgroundColor: 'var(--bg-main)' }}>
+      {/* Header del Panel */}
+      <header style={{ padding: '1rem', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: '10px', background: 'var(--primary)', color: 'white' }}>
+        <button onClick={() => navigate("/")} style={{ background: 'none', border: 'none', color: 'white', cursor: 'pointer' }}>
+          <ArrowLeft size={20} />
         </button>
+        <h2 style={{ fontSize: '1.1rem', margin: 0 }}>Panel de Control</h2>
       </header>
 
-      <main>
-        <div className="stats-cards">
-          <div className="stat-card">
-            <div style={{display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem'}}>
-              <span className="stat-label">{language === 'es' ? 'Consultas Totales' : 'Total Queries'}</span>
-              <MessageCircle size={16} color="var(--primary)" />
-            </div>
-            <span className="stat-value">{queries.length}</span>
+      <div style={{ flex: 1, overflowY: 'auto', padding: '1rem' }}>
+        {/* Mini Estadísticas */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '1.5rem' }}>
+          <div className="stat-card" style={{ padding: '10px', borderRadius: '8px', background: 'var(--bg-bubble-bot)', border: '1px solid var(--border)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '5px', color: 'var(--text-muted)', fontSize: '0.7rem' }}><Users size={12}/> USUARIOS</div>
+            <div style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>{stats.total_users}</div>
           </div>
-          <div className="stat-card">
-            <div style={{display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem'}}>
-              <span className="stat-label">{language === 'es' ? 'Usuarios Activos' : 'Active Users'}</span>
-              <Users size={16} color="var(--primary)" />
-            </div>
-            <span className="stat-value">{new Set(queries.map(q => q.user_email)).size}</span>
+          <div className="stat-card" style={{ padding: '10px', borderRadius: '8px', background: 'rgba(255, 71, 87, 0.1)', border: '1px solid #ff4757' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '5px', color: '#ff4757', fontSize: '0.7rem' }}><ShieldAlert size={12}/> ALERTAS</div>
+            <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: '#ff4757' }}>{stats.total_red_flags}</div>
           </div>
         </div>
 
-        <div className="table-wrapper">
-          <table className="queries-table">
-            <thead>
-              <tr>
-                <th>{language === 'es' ? 'Fecha' : 'Date'}</th>
-                <th>{language === 'es' ? 'Usuario' : 'User'}</th>
-                <th>{language === 'es' ? 'Pregunta' : 'Question'}</th>
-                <th>{language === 'es' ? 'Respuesta' : 'Answer'}</th>
-                <th>{language === 'es' ? 'Tiempo' : 'Time'}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {queries.map((q) => (
-                <tr key={q.id}>
-                  <td className="td-date">{new Date(q.creada_en).toLocaleDateString(language === 'es' ? 'es-ES' : 'en-US')}</td>
-                  <td className="td-user" style={{fontSize: '0.8rem', color: 'var(--primary)'}}>{q.user_email}</td>
-                  <td className="td-text" title={q.pregunta}>{q.pregunta}</td>
-                  <td className="td-text" title={q.respuesta}>{q.respuesta}</td>
-                  <td className="td-time">{Math.round(q.tiempo_respuesta_ms)}ms</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        {/* Lista de Alertas (Red Flags) */}
+        <h3 style={{ fontSize: '0.9rem', color: 'var(--text-muted)', marginBottom: '10px' }}>ALERTAS RECIENTES</h3>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          {redFlags.length === 0 && <p style={{ fontSize: '0.8rem', textAlign: 'center', color: 'var(--text-muted)' }}>No hay alertas registradas.</p>}
+          {redFlags.map(flag => (
+            <div key={flag.id} style={{ padding: '12px', borderRadius: '8px', background: 'var(--bg-bubble-bot)', borderLeft: '4px solid #ff4757', fontSize: '0.85rem' }}>
+              <div style={{ fontWeight: 'bold', marginBottom: '4px', overflow: 'hidden', textOverflow: 'ellipsis' }}>{flag.user_email}</div>
+              <div style={{ fontStyle: 'italic', color: 'var(--text-main)', marginBottom: '4px' }}>"{flag.content}"</div>
+              <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{new Date(flag.timestamp).toLocaleString()}</div>
+            </div>
+          ))}
         </div>
-      </main>
+      </div>
     </div>
   );
 };

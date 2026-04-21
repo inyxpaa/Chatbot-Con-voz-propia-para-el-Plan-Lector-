@@ -1,43 +1,72 @@
 import React from "react";
 import { GoogleLogin } from "@react-oauth/google";
-import { LogIn, BookOpen, Sparkles } from "lucide-react";
+import { BookOpen, ShieldCheck } from "lucide-react";
 
 const LoginPage = ({ onLoginSuccess }) => {
   return (
-    <div className="login-container">
-      <div className="login-card">
-        <header style={{marginBottom: '2rem'}}>
-          <div style={{display: 'inline-flex', padding: '1rem', background: 'rgba(99, 102, 241, 0.1)', borderRadius: '1rem', marginBottom: '1rem'}}>
-            <BookOpen size={40} style={{color: '#6366f1'}} />
-          </div>
-          <h1 style={{fontSize: '2rem', fontWeight: 800, letterSpacing: '-0.02em', marginBottom: '0.5rem'}}>
-            Plan Lector <span style={{color: '#6366f1'}}>AI</span>
-          </h1>
-          <p style={{color: '#94a3b8', fontSize: '0.9rem'}}>Asistente virtual con voz propia</p>
-        </header>
-        
-        <div className="login-body" style={{marginBottom: '2.5rem'}}>
-          <p style={{fontSize: '0.95rem', lineHeight: 1.6, color: '#f8fafc', marginBottom: '2rem'}}>
-            Descubre el universo de tus libros favoritos con nuestra inteligencia artificial personalizada.
-          </p>
-          
-          <div style={{display: 'flex', justifyContent: 'center', background: 'white', padding: '0.5rem', borderRadius: '0.75rem'}}>
-            <GoogleLogin
-              onSuccess={(credentialResponse) => {
-                onLoginSuccess(credentialResponse);
-              }}
-              onError={() => alert("Error al conectar con Google")}
-              useOneTap
-            />
-          </div>
-        </div>
-        
-        <footer style={{borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '1.5rem'}}>
-          <div style={{display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', color: '#64748b', fontSize: '0.75rem'}}>
-            <Sparkles size={14} />
-            <span>Fomentando la lectura activa</span>
-          </div>
-        </footer>
+    <div className="login-widget-container" style={{
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      justifyContent: 'center',
+      height: '100%',
+      padding: '2rem',
+      textAlign: 'center',
+      background: 'var(--bg-main)',
+      color: 'var(--text-main)'
+    }}>
+      {/* Icono Principal / Logo */}
+      <div style={{
+        backgroundColor: 'var(--primary)',
+        padding: '15px',
+        borderRadius: '50%',
+        marginBottom: '1rem',
+        boxShadow: '0 4px 10px rgba(0,0,0,0.2)'
+      }}>
+        <BookOpen size={40} color="white" />
+      </div>
+
+      <h2 style={{ fontSize: '1.4rem', marginBottom: '0.5rem', fontWeight: 'bold' }}>
+        Plan Lector AI
+      </h2>
+      
+      <p style={{ 
+        fontSize: '0.9rem', 
+        color: 'var(--text-muted)', 
+        marginBottom: '2rem',
+        lineHeight: '1.4' 
+      }}>
+        Inicia sesión con tu cuenta del instituto para resolver tus dudas.
+      </p>
+
+      {/* Contenedor del Botón de Google */}
+      <div style={{ 
+        width: '100%', 
+        display: 'flex', 
+        justifyContent: 'center',
+        padding: '10px'
+      }}>
+        <GoogleLogin 
+          onSuccess={onLoginSuccess} 
+          onError={() => console.log("Login Failed")}
+          theme="filled_blue"
+          shape="pill"
+          size="large"
+          width="250px"
+        />
+      </div>
+
+      {/* Pie de página de seguridad */}
+      <div style={{ 
+        marginTop: 'auto', 
+        display: 'flex', 
+        alignItems: 'center', 
+        gap: '5px', 
+        fontSize: '0.75rem', 
+        color: 'var(--text-muted)' 
+      }}>
+        <ShieldCheck size={14} />
+        <span>Acceso seguro vía Google Cloud</span>
       </div>
     </div>
   );
