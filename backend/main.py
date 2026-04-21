@@ -1,8 +1,11 @@
+# --- Chatbot Plan Lector v2.0 (HF enabled) ---
 import os
 import sys
 import json
 import time
 import datetime
+import hashlib
+import re
 from pathlib import Path
 
 import requests
@@ -32,6 +35,24 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+def hash_email(email: str) -> str:
+    """Retorna un hash SHA-256 del email para anonimización."""
+    if not email:
+        return "anonymous"
+    return hashlib.sha256(email.lower().strip().encode()).hexdigest()
+
+def scrub_pii(text: str) -> str:
+    """Ofusca emails y números de teléfono en el texto."""
+    if not text:
+        return ""
+    # Regex para emails
+    text = re.sub(r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}', '[EMAIL]', text)
+    # Regex para teléfonos (formato básico internacional y local)
+    text = re.sub(r'\+?\d{2,4}[-.\s]?\d{3,4}[-.\s]?\d{3,4}[-.\s]?\d{0,4}', '[TELÉFONO]', text)
+    return text
+
 
 
 class ChatQuery(BaseModel):
@@ -140,15 +161,20 @@ async def chat_endpoint(
     tiempo_ms = (time.perf_counter() - inicio) * 1000
 
     # 3. Registrar en PostgreSQL (tabla busquedas)
-    db.add(Busqueda(
-        user_email=user_email,
-        session_id=query.session_id,
-        pregunta=pregunta,
-        respuesta=respuesta,
-        fuentes=json.dumps(fuentes),
-        bloqueada=False,
-        tiempo_respuesta_ms=tiempo_ms,
-    ))
-    db.commit()
+    try:
+        db.add(Busqueda(
+            user_email=hash_email(user_email),
+            session_id=query.session_id,
+            pregunta=scrub_pii(pregunta),
+            respuesta=scrub_pii(respuesta),
+            fuentes=json.dumps(fuentes),
+            bloqueada=False,
+            tiempo_respuesta_ms=tiempo_ms,
+        ))
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        print(f"FATAL: Error al guardar en Postgres: {e}")
+
 
     return ChatResponse(respuesta=respuesta, fuentes=fuentes)
