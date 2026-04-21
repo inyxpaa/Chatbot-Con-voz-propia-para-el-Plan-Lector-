@@ -122,17 +122,17 @@ const Chat = ({ token, user, onLogout }) => {
           </div>
           <div className="header-actions">
             {isAdmin && (
-              <Link to="/admin" className="admin-link-btn" title="Panel Admin">
-                <Shield size={20} />
+              <Link to="/admin" className="admin-link-btn" title="Panel Admin" aria-label="Ir al panel de administración">
+                <Shield size={20} aria-hidden="true" />
               </Link>
             )}
-            <button onClick={onLogout} className="logout-btn" title="Cerrar Sesión">
-              <LogOut size={20} />
+            <button onClick={onLogout} className="logout-btn" title="Cerrar Sesión" aria-label="Cerrar sesión">
+              <LogOut size={20} aria-hidden="true" />
             </button>
           </div>
         </header>
 
-        <section ref={listaRef} className="chatbot-messages">
+        <section ref={listaRef} className="chatbot-messages" aria-live="polite" aria-label="Conversación con el asistente" role="log">
           {mensajes.map((m) => (
             <div key={m.id} className={`chatbot-message chatbot-message--${m.role}`}>
               <div className="chatbot-bubble">
@@ -164,8 +164,8 @@ const Chat = ({ token, user, onLogout }) => {
               onChange={(e) => setEntrada(e.target.value)}
               disabled={ocupado}
             />
-            <button className="chatbot-send" type="submit" disabled={ocupado}>
-              <MessageSquare size={18} />
+            <button className="chatbot-send" type="submit" disabled={ocupado} aria-label="Enviar mensaje">
+              <MessageSquare size={18} aria-hidden="true" />
             </button>
           </div>
         </form>
