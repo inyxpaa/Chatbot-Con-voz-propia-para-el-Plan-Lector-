@@ -43,8 +43,14 @@ jobs:
             sudo docker stop backend-app || true
             sudo docker rm backend-app || true
             sudo docker run -d --name backend-app -p 8000:8000 \
+              --restart unless-stopped \
+              -e MODEL_PROVIDER=local \
+              -e LOCAL_MODEL_PATH=/modelo/qwen_finetuned \
               -e CHROMA_DB_PATH=/app/datalake/datalake/artifacts/chroma_db \
               -e DATABASE_URL=${{ secrets.DATABASE_URL }} \
-              -e MONGODB_URL=${{ secrets.MONGODB_URL }} \
               -e HF_TOKEN=${{ secrets.HF_TOKEN }} \
+              -e MAX_NEW_TOKENS=256 \
+              -e MODEL_TIMEOUT_S=60 \
+              -v /home/ubuntu/modelo/qwen_finetuned:/modelo/qwen_finetuned:ro \
+              -v /home/ubuntu/chroma_db:/app/datalake/datalake/artifacts/chroma_db:ro \
               ${{ secrets.DOCKERHUB_USERNAME }}/plan-lector-backend:latest
