@@ -57,71 +57,71 @@ const AdminPanel = ({ token, user, language = "es" }) => {
         </button>
       </header>
 
-      <main style={{padding: '2rem', maxWidth: '1400px', margin: '0 auto', width: '100%'}}>
-        <div className="stats-cards" style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1.5rem', marginBottom: '2.5rem'}}>
-          <div className="stat-card" style={{background: 'rgba(255,255,255,0.03)', border: '1px solid var(--glass-border)', padding: '1.5rem', borderRadius: '1.25rem'}}>
-            <div style={{display: 'flex', justifyContent: 'space-between', marginBottom: '1rem'}}>
-              <span style={{fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase'}}>{language === 'es' ? 'Interacciones' : 'Interactions'}</span>
-              <MessageCircle size={20} color="var(--primary)" />
+      <main className="admin-main" style={{padding: '1.5rem', maxWidth: '1400px', margin: '0 auto', width: '100%'}}>
+        <div className="stats-cards" style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '2rem'}}>
+          <div className="stat-card" style={{background: 'rgba(255,255,255,0.03)', border: '1px solid var(--glass-border)', padding: '1.25rem', borderRadius: '1rem'}}>
+            <div style={{display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem'}}>
+              <span style={{fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase'}}>{language === 'es' ? 'Interacciones' : 'Interactions'}</span>
+              <MessageCircle size={18} color="var(--primary)" />
             </div>
-            <span style={{fontSize: '2rem', fontWeight: 800}}>{queries.length}</span>
+            <span style={{fontSize: '1.5rem', fontWeight: 800}}>{queries.length}</span>
           </div>
           
-          <div className="stat-card" style={{background: 'rgba(255,255,255,0.03)', border: '1px solid var(--glass-border)', padding: '1.5rem', borderRadius: '1.25rem'}}>
-            <div style={{display: 'flex', justifyContent: 'space-between', marginBottom: '1rem'}}>
-              <span style={{fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase'}}>{language === 'es' ? 'Usuarios' : 'Users'}</span>
-              <Users size={20} color="var(--primary)" />
+          <div className="stat-card" style={{background: 'rgba(255,255,255,0.03)', border: '1px solid var(--glass-border)', padding: '1.25rem', borderRadius: '1rem'}}>
+            <div style={{display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem'}}>
+              <span style={{fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase'}}>{language === 'es' ? 'Usuarios' : 'Users'}</span>
+              <Users size={18} color="var(--primary)" />
             </div>
-            <span style={{fontSize: '2rem', fontWeight: 800}}>{new Set(queries.map(q => q.user_email)).size}</span>
+            <span style={{fontSize: '1.5rem', fontWeight: 800}}>{new Set(queries.map(q => q.user_email)).size}</span>
           </div>
 
-          <div className="stat-card" style={{background: 'rgba(255,255,255,0.03)', border: '1px solid var(--glass-border)', padding: '1.5rem', borderRadius: '1.25rem'}}>
-            <div style={{display: 'flex', justifyContent: 'space-between', marginBottom: '1rem'}}>
-              <span style={{fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase'}}>{language === 'es' ? 'Latencia Media' : 'Avg Latency'}</span>
-              <Clock size={20} color="#10b981" />
+          <div className="stat-card" style={{background: 'rgba(255,255,255,0.03)', border: '1px solid var(--glass-border)', padding: '1.25rem', borderRadius: '1rem'}}>
+            <div style={{display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem'}}>
+              <span style={{fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase'}}>{language === 'es' ? 'Latencia Media' : 'Avg Latency'}</span>
+              <Clock size={18} color="#10b981" />
             </div>
-            <span style={{fontSize: '2rem', fontWeight: 800}}>
+            <span style={{fontSize: '1.5rem', fontWeight: 800}}>
               {Math.round(queries.reduce((acc, q) => acc + (q.tiempo_respuesta_ms || 0), 0) / (queries.length || 1))}ms
             </span>
           </div>
         </div>
 
-        <div className="table-wrapper" style={{background: 'rgba(255,255,255,0.02)', border: '1px solid var(--glass-border)', borderRadius: '1.5rem', overflow: 'hidden'}}>
+        <div className="table-wrapper" style={{background: 'rgba(255,255,255,0.02)', border: '1px solid var(--glass-border)', borderRadius: '1.25rem', overflowX: 'auto'}}>
           <table className="queries-table" style={{width: '100%', borderCollapse: 'collapse', textAlign: 'left'}}>
             <thead>
               <tr style={{background: 'rgba(255,255,255,0.03)', borderBottom: '1px solid var(--glass-border)'}}>
-                <th style={{padding: '1.2rem', fontSize: '0.75rem', color: '#64748b', textTransform: 'uppercase'}}>Timestamp</th>
-                <th style={{padding: '1.2rem', fontSize: '0.75rem', color: '#64748b', textTransform: 'uppercase'}}>Status</th>
-                <th style={{padding: '1.2rem', fontSize: '0.75rem', color: '#64748b', textTransform: 'uppercase'}}>User Hash</th>
-                <th style={{padding: '1.2rem', fontSize: '0.75rem', color: '#64748b', textTransform: 'uppercase'}}>Query / Response</th>
-                <th style={{padding: '1.2rem', fontSize: '0.75rem', color: '#64748b', textTransform: 'uppercase'}}>Time</th>
+                <th style={{padding: '1rem', fontSize: '0.7rem', color: '#64748b', textTransform: 'uppercase'}}>Timestamp</th>
+                <th style={{padding: '1rem', fontSize: '0.7rem', color: '#64748b', textTransform: 'uppercase'}}>Status</th>
+                <th style={{padding: '1rem', fontSize: '0.7rem', color: '#64748b', textTransform: 'uppercase'}}>User Hash</th>
+                <th style={{padding: '1rem', fontSize: '0.7rem', color: '#64748b', textTransform: 'uppercase'}}>Query / Response</th>
+                <th style={{padding: '1rem', fontSize: '0.7rem', color: '#64748b', textTransform: 'uppercase'}}>Time</th>
               </tr>
             </thead>
             <tbody>
               {queries.map((q) => (
-                <tr key={q.id} style={{borderBottom: '1px solid var(--glass-border)', transition: 'background 0.2s'}} className="admin-row-hover">
-                  <td style={{padding: '1.2rem', fontSize: '0.85rem', whiteSpace: 'nowrap', color: '#94a3b8'}}>
+                <tr key={q.id} style={{borderBottom: '1px solid var(--glass-border)'}}>
+                  <td data-label="Timestamp" style={{padding: '1rem', fontSize: '0.8rem', color: '#94a3b8'}}>
                     {new Date(q.creada_en).toLocaleString(language === 'es' ? 'es-ES' : 'en-US', {month:'short', day:'numeric', hour:'2-digit', minute:'2-digit'})}
                   </td>
-                  <td style={{padding: '1.2rem'}}>
+                  <td data-label="Status" style={{padding: '1rem'}}>
                     {q.bloqueada ? (
-                      <span style={{color: '#f87171', display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.75rem', fontWeight: 700}}>
-                        <AlertOctagon size={14} /> BLOCKED
+                      <span style={{color: '#f87171', display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.7rem', fontWeight: 700}}>
+                        <AlertOctagon size={12} /> BLOCKED
                       </span>
                     ) : (
-                      <span style={{color: '#10b981', display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.75rem', fontWeight: 700}}>
-                        <CheckCircle size={14} /> OK
+                      <span style={{color: '#10b981', display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.7rem', fontWeight: 700}}>
+                        <CheckCircle size={12} /> OK
                       </span>
                     )}
                   </td>
-                  <td style={{padding: '1.2rem', fontSize: '0.8rem', color: 'var(--primary)', fontFamily: 'monospace'}}>
-                    {q.user_email?.substring(0, 12)}...
+                  <td data-label="User Hash" style={{padding: '1rem', fontSize: '0.75rem', color: 'var(--primary)', fontFamily: 'monospace'}}>
+                    {q.user_email?.substring(0, 8)}...
                   </td>
-                  <td style={{padding: '1.2rem'}}>
-                    <div style={{fontSize: '0.9rem', color: '#f8fafc', marginBottom: '0.4rem', fontWeight: 600}}>Q: {q.pregunta}</div>
-                    <div style={{fontSize: '0.85rem', color: '#94a3b8', fontStyle: 'italic', maxWidth: '600px'}}>A: {q.respuesta?.substring(0, 150)}{q.respuesta?.length > 150 ? '...' : ''}</div>
+                  <td data-label="Query / Response" style={{padding: '1rem'}}>
+                    <div style={{fontSize: '0.85rem', color: '#f8fafc', marginBottom: '0.2rem', fontWeight: 600}}>Q: {q.pregunta}</div>
+                    <div style={{fontSize: '0.8rem', color: '#94a3b8', fontStyle: 'italic', maxWidth: '600px'}}>A: {q.respuesta?.substring(0, 100)}{q.respuesta?.length > 100 ? '...' : ''}</div>
                   </td>
-                  <td style={{padding: '1.2rem', fontSize: '0.85rem', fontWeight: 700, color: (q.tiempo_respuesta_ms > 2000 ? '#fbbf24' : '#f8fafc')}}>
+                  <td data-label="Time" style={{padding: '1rem', fontSize: '0.8rem', fontWeight: 700, color: (q.tiempo_respuesta_ms > 2000 ? '#fbbf24' : '#f8fafc')}}>
                     {Math.round(q.tiempo_respuesta_ms)}ms
                   </td>
                 </tr>
@@ -130,6 +130,7 @@ const AdminPanel = ({ token, user, language = "es" }) => {
           </table>
         </div>
       </main>
+
     </div>
   );
 };
