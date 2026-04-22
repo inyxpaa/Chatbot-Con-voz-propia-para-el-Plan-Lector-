@@ -246,6 +246,11 @@ const Chat = ({ token, user, onLogout, language, setLanguage, theme, setTheme })
             <button className="mobile-toggle" onClick={() => setShowSidebar(!showSidebar)}>
               {showSidebar ? <X size={24} /> : <Menu size={24} />}
             </button>
+            <img
+              src="/android-chrome-192x192.png"
+              alt="LIA logo"
+              style={{width: '36px', height: '36px', borderRadius: '10px', objectFit: 'cover', flexShrink: 0}}
+            />
             <h1 className="chatbot-title">LIA</h1>
           </div>
 
