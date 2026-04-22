@@ -8,12 +8,9 @@ import datetime
 from pathlib import Path
 
 import requests
-import torch
-import psutil
 import traceback
-from transformers import AutoModelForCausalLM, AutoTokenizer
-from peft import PeftModel
-from fastapi import FastAPI, Depends, Header, HTTPException
+from fastapi import FastAPI, Depends, Header, HTTPException, BackgroundTasks
+from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
@@ -23,15 +20,10 @@ from google.auth.transport import requests as google_requests
 from database import SessionLocal, create_tables, Busqueda, User
 from modelo.filtro import verificar_consulta
 
-# Configuración
+# Configuración Ollama
 GOOGLE_CLIENT_ID = "22015513342-rp17v8jccio7gvnhkdma2vpigerrnu44.apps.googleusercontent.com"
-HF_MODEL_ID = "Qwen/Qwen2.5-1.5B-Instruct" 
-HF_ADAPTER_ID = "inyxpa/chatbot"
-HF_TOKEN = os.getenv("HF_TOKEN", "")
-
-# Variables globales para el modelo local (se cargan al inicio)
-assistant_model = None
-assistant_tokenizer = None
+OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434/api/generate")
+OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "qwen2.5:1.5b")
 
 create_tables()
 
@@ -82,94 +74,54 @@ def verify_google_token(authorization: str = Header(None)) -> dict:
         print(f"Error validando token: {e}")
         raise HTTPException(status_code=401, detail="Token de Google inválido")
 
-def query_local_model(prompt: str, idioma: str = "es") -> str:
-    """Genera respuesta usando el modelo cargado en memoria local."""
-    global assistant_model, assistant_tokenizer
-    
-    if assistant_model is None or assistant_tokenizer is None:
-        return "The AI brain is loading..." if idioma == "en" else "El cerebro del asistente aún se está cargando..."
-        
+def save_chat_to_db(user_email: str, session_id: str, pregunta: str, respuesta: str, fuentes: list, tiempo_ms: float):
+    """Guarda el log de la consulta en la BD en segundo plano."""
+    db = SessionLocal()
     try:
-        mem = psutil.virtual_memory()
-        print(f"Generando respuesta ({idioma})... Memoria disponible: {mem.available / (1024**2):.2f} MB")
-
-        system_msg = (
-            "You are an expert assistant for the school Reading Plan. You help students with doubts about books and readings. Answer in English."
-            if idioma == "en" else
-            "Eres un asistente experto en el Plan Lector del centro. Ayudas a los alumnos con dudas sobre libros y lecturas. Responde siempre en español."
-        )
-
-        messages = [
-            {"role": "system", "content": system_msg},
-            {"role": "user", "content": prompt}
-        ]
-        
-        inputs = assistant_tokenizer.apply_chat_template(
-            messages, 
-            add_generation_prompt=True, 
-            return_tensors="pt",
-            return_dict=True
-        ).to("cpu")
-        
-        with torch.no_grad():
-            outputs = assistant_model.generate(
-                inputs["input_ids"],
-                attention_mask=inputs.get("attention_mask"),
-                max_new_tokens=256,
-                do_sample=True, 
-                temperature=0.7,
-                pad_token_id=assistant_tokenizer.eos_token_id
-            )
-        
-        input_length = inputs["input_ids"].shape[-1]
-        decoded = assistant_tokenizer.decode(outputs[0][input_length:], skip_special_tokens=True)
-        return decoded.strip()
-            
+        db.add(Busqueda(
+            user_email=user_email,
+            session_id=session_id,
+            pregunta=pregunta,
+            respuesta=respuesta,
+            fuentes=json.dumps(fuentes),
+            bloqueada=False,
+            tiempo_respuesta_ms=tiempo_ms,
+        ))
+        db.commit()
     except Exception as e:
-        print(traceback.format_exc())
-        return f"Error: {str(e)}"
+        db.rollback()
+        print(f"FATAL: Error al guardar en Postgres: {e}")
+    finally:
+        db.close()
 
-@app.on_event("startup")
-async def startup_event():
-    """Carga el modelo de IA al iniciar el servidor optimizado para 4GB RAM."""
-    global assistant_model, assistant_tokenizer
-    import gc
+def query_ollama_stream(prompt: str, idioma: str = "es"):
+    """Genera respuesta usando Ollama local y la envía en stream."""
+    system_msg = (
+        "You are LIA, an expert assistant for the school Reading Plan. You help students with doubts about books and readings. Answer in English."
+        if idioma == "en" else
+        "Eres LIA, un asistente experto en el Plan Lector del centro. Ayudas a los alumnos con dudas sobre libros y lecturas. Responde siempre de forma amable."
+    )
+
+    payload = {
+        "model": OLLAMA_MODEL,
+        "prompt": prompt,
+        "system": system_msg,
+        "stream": True,
+        "options": {
+            "temperature": 0.7
+        }
+    }
     
-    print("--- [INICIO] Cargando Cerebro Local (t3.medium optimized) ---")
     try:
-        # 1. Cargar Tokenizer primero
-        assistant_tokenizer = AutoTokenizer.from_pretrained(HF_MODEL_ID, token=HF_TOKEN)
-        
-        # 2. Cargar Modelo base en Float16 (Usa ~3GB RAM)
-        print(f"Cargando modelo base {HF_MODEL_ID} en float16...")
-        base_model = AutoModelForCausalLM.from_pretrained(
-            HF_MODEL_ID,
-            torch_dtype=torch.float16,
-            low_cpu_mem_usage=True,
-            device_map="cpu",
-            token=HF_TOKEN
-        )
-        
-        # 3. Forzar limpieza de RAM antes de cargar el adaptador
-        gc.collect()
-        
-        # 4. Cargar el adaptador LoRA
-        print(f"Cargando adaptador {HF_ADAPTER_ID}...")
-        assistant_model = PeftModel.from_pretrained(
-            base_model, 
-            HF_ADAPTER_ID,
-            token=HF_TOKEN
-        )
-        assistant_model.eval()
-        
-        # 5. Limpieza final
-        gc.collect()
-        print("--- [EXITO] Modelo listo en memoria local ---")
-        
+        with requests.post(OLLAMA_URL, json=payload, stream=True, timeout=30) as r:
+            r.raise_for_status()
+            for line in r.iter_lines():
+                if line:
+                    data = json.loads(line.decode('utf-8'))
+                    yield data.get("response", "")
     except Exception as e:
-        print(f"--- [ERROR FATAL] No se pudo cargar el modelo: ---")
-        print(traceback.format_exc())
-        assistant_model = None
+        print(f"Error connecting to Ollama: {e}")
+        yield " LIA no puede conectar con el motor local (Ollama). Por favor, asegúrate de que Ollama está ejecutándose en el servidor."
 
 
 
@@ -252,9 +204,10 @@ async def delete_session(
 @app.post("/chat")
 async def chat_endpoint(
     query: ChatQuery, 
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     id_info: dict = Depends(verify_google_token)
-) -> ChatResponse:
+):
     inicio = time.perf_counter()
     pregunta = query.mensaje.strip()
     user_email = id_info["email"]
@@ -286,31 +239,20 @@ async def chat_endpoint(
         db.commit()
         return ChatResponse(respuesta=resultado_filtro["mensaje"], fuentes=[])
 
-    # 3. Generar respuesta usando el modelo local
-    try:
-        respuesta = query_local_model(pregunta, idioma=query.idioma)
-        fuentes = ["IA Local (Qwen 1.5B + Adapter)"]
-    except Exception as e:
-        print("ERROR EN INFERENCIA LOCAL:", e)
-        respuesta = "Ahora mismo no puedo procesar tu duda localmente. Inténtalo de nuevo."
-        fuentes = []
+    # 3. Streaming de respuesta
+    def response_generator():
+        respuesta_completa = ""
+        fuentes = ["Motor Local (Ollama)"]
+        
+        for chunk in query_ollama_stream(pregunta, query.idioma):
+            respuesta_completa += chunk
+            yield f"data: {json.dumps({'chunk': chunk})}\n\n"
+            
+        tiempo_ms = (time.perf_counter() - inicio) * 1000
+        yield f"data: {json.dumps({'done': True, 'fuentes': fuentes})}\n\n"
+        
+        background_tasks.add_task(
+            save_chat_to_db, user_email, query.session_id, pregunta, respuesta_completa, fuentes, tiempo_ms
+        )
 
-    tiempo_ms = (time.perf_counter() - inicio) * 1000
-
-    # 4. Registrar en PostgreSQL (tabla busquedas)
-    try:
-        db.add(Busqueda(
-            user_email=user_email,
-            session_id=query.session_id,
-            pregunta=pregunta,
-            respuesta=respuesta,
-            fuentes=json.dumps(fuentes),
-            bloqueada=False,
-            tiempo_respuesta_ms=tiempo_ms,
-        ))
-        db.commit()
-    except Exception as e:
-        db.rollback()
-        print(f"FATAL: Error al guardar en Postgres: {e}")
-
-    return ChatResponse(respuesta=respuesta, fuentes=fuentes)
+    return StreamingResponse(response_generator(), media_type="text/event-stream")
