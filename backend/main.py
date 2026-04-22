@@ -35,7 +35,8 @@ assistant_tokenizer = None
 
 create_tables()
 
-app = FastAPI(title="API del Chatbot 'Con voz propia' — Plan Lector")
+app = FastAPI(title="LIA — Asistente del Plan Lector")
+
 
 app.add_middleware(
     CORSMiddleware,
