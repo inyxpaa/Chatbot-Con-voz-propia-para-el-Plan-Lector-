@@ -255,4 +255,12 @@ async def chat_endpoint(
             save_chat_to_db, user_email, query.session_id, pregunta, respuesta_completa, fuentes, tiempo_ms
         )
 
-    return StreamingResponse(response_generator(), media_type="text/event-stream")
+    return StreamingResponse(
+        response_generator(), 
+        media_type="text/event-stream",
+        headers={
+            "X-Accel-Buffering": "no",
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive"
+        }
+    )
