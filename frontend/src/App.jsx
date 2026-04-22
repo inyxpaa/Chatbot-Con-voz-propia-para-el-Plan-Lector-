@@ -301,13 +301,22 @@ export default function App() {
     localStorage.setItem(CLAVE_STORAGE_TOKEN, jwtToken);
     
     try {
-      const payload = JSON.parse(atob(jwtToken.split(".")[1]));
+      const base64Url = jwtToken.split(".")[1];
+      const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
+      const jsonPayload = decodeURIComponent(
+        atob(base64)
+          .split("")
+          .map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
+          .join("")
+      );
+      const payload = JSON.parse(jsonPayload);
       const userData = { email: payload.email, name: payload.name, picture: payload.picture };
       setUser(userData);
       localStorage.setItem(CLAVE_STORAGE_USER, JSON.stringify(userData));
     } catch (e) {
       console.error("Error decoding token", e);
     }
+
   };
 
   const handleLogout = () => {
