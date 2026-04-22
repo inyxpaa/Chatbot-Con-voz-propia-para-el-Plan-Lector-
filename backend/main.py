@@ -130,32 +130,46 @@ def query_local_model(prompt: str, idioma: str = "es") -> str:
 
 @app.on_event("startup")
 async def startup_event():
-    """Carga el modelo de IA al iniciar el servidor."""
+    """Carga el modelo de IA al iniciar el servidor optimizado para 4GB RAM."""
     global assistant_model, assistant_tokenizer
+    import gc
     
-    print("Iniciando carga del modelo local...")
+    print("--- [INICIO] Cargando Cerebro Local (t3.medium optimized) ---")
     try:
-        # Cargar Tokenizer
-        assistant_tokenizer = AutoTokenizer.from_pretrained(HF_MODEL_ID)
+        # 1. Cargar Tokenizer primero
+        assistant_tokenizer = AutoTokenizer.from_pretrained(HF_MODEL_ID, token=HF_TOKEN)
         
-        # Cargar Modelo base en Float16 para ahorrar RAM
-        print(f"Cargando modelo base {HF_MODEL_ID}...")
+        # 2. Cargar Modelo base en Float16 (Usa ~3GB RAM)
+        print(f"Cargando modelo base {HF_MODEL_ID} en float16...")
         base_model = AutoModelForCausalLM.from_pretrained(
             HF_MODEL_ID,
             torch_dtype=torch.float16,
             low_cpu_mem_usage=True,
-            device_map="cpu"
+            device_map="cpu",
+            token=HF_TOKEN
         )
         
-        # Cargar el adaptador LoRA
-        print(f"Cargando adaptador {HF_ADAPTER_ID}...")
-        assistant_model = PeftModel.from_pretrained(base_model, HF_ADAPTER_ID)
-        assistant_model.eval() # Poner en modo evaluación
+        # 3. Forzar limpieza de RAM antes de cargar el adaptador
+        gc.collect()
         
-        print("¡Modelo cargado y listo para usar localmente!")
-    except Exception:
-        print(f"FATAL: No se pudo cargar el modelo local al inicio:")
+        # 4. Cargar el adaptador LoRA
+        print(f"Cargando adaptador {HF_ADAPTER_ID}...")
+        assistant_model = PeftModel.from_pretrained(
+            base_model, 
+            HF_ADAPTER_ID,
+            token=HF_TOKEN
+        )
+        assistant_model.eval()
+        
+        # 5. Limpieza final
+        gc.collect()
+        print("--- [EXITO] Modelo listo en memoria local ---")
+        
+    except Exception as e:
+        print(f"--- [ERROR FATAL] No se pudo cargar el modelo: ---")
         print(traceback.format_exc())
+        assistant_model = None
+
 
 
 
