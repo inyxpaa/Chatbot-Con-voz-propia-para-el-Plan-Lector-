@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
-import { Table, Search, ShieldCheck, ArrowLeft, Loader2, Users, MessageCircle } from "lucide-react";
+import { ShieldCheck, ArrowLeft, Loader2, Users, MessageCircle, Clock, CheckCircle, AlertOctagon } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 import translations from "./translations";
@@ -32,68 +32,98 @@ const AdminPanel = ({ token, user, language = "es" }) => {
   };
 
   if (loading) return (
-    <div className="login-container">
-      <div className="admin-loading" style={{textAlign: 'center'}}>
-        <Loader2 className="spinner" size={48} style={{color: '#6366f1', marginBottom: '1rem'}} />
-        <p>Cargando auditoría...</p>
+    <div className="chatbot-app" style={{justifyContent: 'center', alignItems: 'center'}}>
+      <div style={{textAlign: 'center'}}>
+        <Loader2 className="spinner" size={48} style={{color: 'var(--primary)', marginBottom: '1rem'}} />
+        <p style={{color: 'var(--text-muted)', fontWeight: 600}}>Cargando Observabilidad...</p>
       </div>
     </div>
   );
 
   return (
-    <div className="admin-container">
-      <header className="admin-header">
+    <div className="chatbot-app" style={{flexDirection: 'column', overflowY: 'auto'}}>
+      <header className="chatbot-header" style={{position: 'sticky', top: 0, zIndex: 100, width: '100%'}}>
         <div style={{display: 'flex', alignItems: 'center', gap: '1rem'}}>
-          <ShieldCheck size={32} style={{color: 'var(--primary)'}} />
+          <ShieldCheck size={28} style={{color: 'var(--primary)'}} />
           <div>
-            <h1 style={{fontSize: '1.5rem', fontWeight: 800}}>{t.admin_panel}</h1>
-            <p style={{fontSize: '0.8rem', color: 'var(--text-muted)'}}>
-              {language === 'es' ? `Monitorizando ${queries.length} interacciones` : `Monitoring ${queries.length} interactions`}
+            <h1 className="chatbot-title" style={{fontSize: '1.2rem'}}>{t.admin_panel}</h1>
+            <p style={{fontSize: '0.7rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em'}}>
+              {language === 'es' ? `Sistema de Observabilidad · ${queries.length} registros` : `Observability System · ${queries.length} logs`}
             </p>
           </div>
         </div>
-        <button onClick={() => navigate("/")} className="new-chat-btn" style={{width: 'auto', padding: '0.5rem 1rem'}}>
-          <ArrowLeft size={16} /> {t.back}
+        <button onClick={() => navigate("/")} className="icon-btn" style={{display: 'flex', gap: '0.5rem', padding: '0.6rem 1rem'}}>
+          <ArrowLeft size={18} /> {t.back}
         </button>
       </header>
 
-      <main>
-        <div className="stats-cards">
-          <div className="stat-card">
-            <div style={{display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem'}}>
-              <span className="stat-label">{language === 'es' ? 'Consultas Totales' : 'Total Queries'}</span>
-              <MessageCircle size={16} color="var(--primary)" />
+      <main style={{padding: '2rem', maxWidth: '1400px', margin: '0 auto', width: '100%'}}>
+        <div className="stats-cards" style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1.5rem', marginBottom: '2.5rem'}}>
+          <div className="stat-card" style={{background: 'rgba(255,255,255,0.03)', border: '1px solid var(--glass-border)', padding: '1.5rem', borderRadius: '1.25rem'}}>
+            <div style={{display: 'flex', justifyContent: 'space-between', marginBottom: '1rem'}}>
+              <span style={{fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase'}}>{language === 'es' ? 'Interacciones' : 'Interactions'}</span>
+              <MessageCircle size={20} color="var(--primary)" />
             </div>
-            <span className="stat-value">{queries.length}</span>
+            <span style={{fontSize: '2rem', fontWeight: 800}}>{queries.length}</span>
           </div>
-          <div className="stat-card">
-            <div style={{display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem'}}>
-              <span className="stat-label">{language === 'es' ? 'Usuarios Activos' : 'Active Users'}</span>
-              <Users size={16} color="var(--primary)" />
+          
+          <div className="stat-card" style={{background: 'rgba(255,255,255,0.03)', border: '1px solid var(--glass-border)', padding: '1.5rem', borderRadius: '1.25rem'}}>
+            <div style={{display: 'flex', justifyContent: 'space-between', marginBottom: '1rem'}}>
+              <span style={{fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase'}}>{language === 'es' ? 'Usuarios' : 'Users'}</span>
+              <Users size={20} color="var(--primary)" />
             </div>
-            <span className="stat-value">{new Set(queries.map(q => q.user_email)).size}</span>
+            <span style={{fontSize: '2rem', fontWeight: 800}}>{new Set(queries.map(q => q.user_email)).size}</span>
+          </div>
+
+          <div className="stat-card" style={{background: 'rgba(255,255,255,0.03)', border: '1px solid var(--glass-border)', padding: '1.5rem', borderRadius: '1.25rem'}}>
+            <div style={{display: 'flex', justifyContent: 'space-between', marginBottom: '1rem'}}>
+              <span style={{fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase'}}>{language === 'es' ? 'Latencia Media' : 'Avg Latency'}</span>
+              <Clock size={20} color="#10b981" />
+            </div>
+            <span style={{fontSize: '2rem', fontWeight: 800}}>
+              {Math.round(queries.reduce((acc, q) => acc + (q.tiempo_respuesta_ms || 0), 0) / (queries.length || 1))}ms
+            </span>
           </div>
         </div>
 
-        <div className="table-wrapper">
-          <table className="queries-table">
+        <div className="table-wrapper" style={{background: 'rgba(255,255,255,0.02)', border: '1px solid var(--glass-border)', borderRadius: '1.5rem', overflow: 'hidden'}}>
+          <table className="queries-table" style={{width: '100%', borderCollapse: 'collapse', textAlign: 'left'}}>
             <thead>
-              <tr>
-                <th>{language === 'es' ? 'Fecha' : 'Date'}</th>
-                <th>{language === 'es' ? 'Usuario' : 'User'}</th>
-                <th>{language === 'es' ? 'Pregunta' : 'Question'}</th>
-                <th>{language === 'es' ? 'Respuesta' : 'Answer'}</th>
-                <th>{language === 'es' ? 'Tiempo' : 'Time'}</th>
+              <tr style={{background: 'rgba(255,255,255,0.03)', borderBottom: '1px solid var(--glass-border)'}}>
+                <th style={{padding: '1.2rem', fontSize: '0.75rem', color: '#64748b', textTransform: 'uppercase'}}>Timestamp</th>
+                <th style={{padding: '1.2rem', fontSize: '0.75rem', color: '#64748b', textTransform: 'uppercase'}}>Status</th>
+                <th style={{padding: '1.2rem', fontSize: '0.75rem', color: '#64748b', textTransform: 'uppercase'}}>User Hash</th>
+                <th style={{padding: '1.2rem', fontSize: '0.75rem', color: '#64748b', textTransform: 'uppercase'}}>Query / Response</th>
+                <th style={{padding: '1.2rem', fontSize: '0.75rem', color: '#64748b', textTransform: 'uppercase'}}>Time</th>
               </tr>
             </thead>
             <tbody>
               {queries.map((q) => (
-                <tr key={q.id}>
-                  <td className="td-date">{new Date(q.creada_en).toLocaleDateString(language === 'es' ? 'es-ES' : 'en-US')}</td>
-                  <td className="td-user" style={{fontSize: '0.8rem', color: 'var(--primary)'}}>{q.user_email}</td>
-                  <td className="td-text" title={q.pregunta}>{q.pregunta}</td>
-                  <td className="td-text" title={q.respuesta}>{q.respuesta}</td>
-                  <td className="td-time">{Math.round(q.tiempo_respuesta_ms)}ms</td>
+                <tr key={q.id} style={{borderBottom: '1px solid var(--glass-border)', transition: 'background 0.2s'}} className="admin-row-hover">
+                  <td style={{padding: '1.2rem', fontSize: '0.85rem', whiteSpace: 'nowrap', color: '#94a3b8'}}>
+                    {new Date(q.creada_en).toLocaleString(language === 'es' ? 'es-ES' : 'en-US', {month:'short', day:'numeric', hour:'2-digit', minute:'2-digit'})}
+                  </td>
+                  <td style={{padding: '1.2rem'}}>
+                    {q.bloqueada ? (
+                      <span style={{color: '#f87171', display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.75rem', fontWeight: 700}}>
+                        <AlertOctagon size={14} /> BLOCKED
+                      </span>
+                    ) : (
+                      <span style={{color: '#10b981', display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.75rem', fontWeight: 700}}>
+                        <CheckCircle size={14} /> OK
+                      </span>
+                    )}
+                  </td>
+                  <td style={{padding: '1.2rem', fontSize: '0.8rem', color: 'var(--primary)', fontFamily: 'monospace'}}>
+                    {q.user_email?.substring(0, 12)}...
+                  </td>
+                  <td style={{padding: '1.2rem'}}>
+                    <div style={{fontSize: '0.9rem', color: '#f8fafc', marginBottom: '0.4rem', fontWeight: 600}}>Q: {q.pregunta}</div>
+                    <div style={{fontSize: '0.85rem', color: '#94a3b8', fontStyle: 'italic', maxWidth: '600px'}}>A: {q.respuesta?.substring(0, 150)}{q.respuesta?.length > 150 ? '...' : ''}</div>
+                  </td>
+                  <td style={{padding: '1.2rem', fontSize: '0.85rem', fontWeight: 700, color: (q.tiempo_respuesta_ms > 2000 ? '#fbbf24' : '#f8fafc')}}>
+                    {Math.round(q.tiempo_respuesta_ms)}ms
+                  </td>
                 </tr>
               ))}
             </tbody>
