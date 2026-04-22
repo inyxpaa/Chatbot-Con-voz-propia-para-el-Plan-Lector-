@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Routes, Route, Navigate, useNavigate, Link } from "react-router-dom";
-import { LogOut, Shield, MessageSquare, Loader2, Trash2, Settings, Moon, Sun, Languages, Send } from "lucide-react";
+import { LogOut, Shield, MessageSquare, Loader2, Trash2, Settings, Moon, Sun, Languages, Send, Menu, X } from "lucide-react";
 import LoginPage from "./LoginPage";
 import AdminPanel from "./AdminPanel";
 import translations from "./translations";
@@ -37,6 +37,7 @@ const Chat = ({ token, user, onLogout, language, setLanguage, theme, setTheme })
   const [sesiones, setSesiones] = useState([]);
   const [mensajes, setMensajes] = useState([]);
   const [showSettings, setShowSettings] = useState(false);
+  const [showSidebar, setShowSidebar] = useState(false);
 
   const listaRef = useRef(null);
   const navigate = useNavigate();
@@ -116,6 +117,7 @@ const Chat = ({ token, user, onLogout, language, setLanguage, theme, setTheme })
     setIdSesion(sid);
     sessionStorage.setItem(CLAVE_STORAGE_SESION, sid);
     cargarHistorial(sid);
+    setShowSidebar(false); // Cerrar en móvil al seleccionar
   };
 
   useEffect(() => {
@@ -198,8 +200,9 @@ const Chat = ({ token, user, onLogout, language, setLanguage, theme, setTheme })
   ].includes(user.email);
 
   return (
-    <main className="chatbot-app">
-      <aside className="sidebar">
+    <main className={`chatbot-app ${showSidebar ? "sidebar-open" : ""}`}>
+      {showSidebar && <div className="sidebar-overlay" onClick={() => setShowSidebar(false)} />}
+      <aside className={`sidebar ${showSidebar ? "active" : ""}`}>
         <div className="sidebar-header">
            <button className="new-chat-btn" onClick={nuevoChat}>
              <MessageSquare size={18} /> {t.new_chat}
@@ -239,7 +242,12 @@ const Chat = ({ token, user, onLogout, language, setLanguage, theme, setTheme })
 
       <section className="chatbot-container">
         <header className="chatbot-header">
-          <h1 className="chatbot-title">LIA</h1>
+          <div style={{display: 'flex', alignItems: 'center', gap: '1rem'}}>
+            <button className="mobile-toggle" onClick={() => setShowSidebar(!showSidebar)}>
+              {showSidebar ? <X size={24} /> : <Menu size={24} />}
+            </button>
+            <h1 className="chatbot-title">LIA</h1>
+          </div>
 
           <div className="header-actions">
             <button onClick={() => setShowSettings(!showSettings)} className="icon-btn" title={t.settings}>
