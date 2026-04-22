@@ -1,42 +1,71 @@
 import React from "react";
 import { GoogleLogin } from "@react-oauth/google";
-import { LogIn, BookOpen, Sparkles } from "lucide-react";
+import { BookOpen, Sparkles, Brain, Users } from "lucide-react";
 
 const LoginPage = ({ onLoginSuccess }) => {
   return (
-    <div className="login-container">
+    <div className="login-page">
+      {/* Fondo animado */}
+      <div className="login-bg-orb login-bg-orb--1" />
+      <div className="login-bg-orb login-bg-orb--2" />
+      <div className="login-bg-orb login-bg-orb--3" />
+
       <div className="login-card">
-        <header style={{marginBottom: '2rem'}}>
-          <div style={{display: 'inline-flex', padding: '1rem', background: 'rgba(99, 102, 241, 0.1)', borderRadius: '1rem', marginBottom: '1rem'}}>
-            <BookOpen size={40} style={{color: '#6366f1'}} />
-          </div>
-          <h1 style={{fontSize: '2rem', fontWeight: 800, letterSpacing: '-0.02em', marginBottom: '0.5rem'}}>
-            Plan Lector <span style={{color: '#6366f1'}}>AI</span>
+        {/* Logo */}
+        <div className="login-logo">
+          <img src="/android-chrome-192x192.png" alt="LIA" className="login-logo-img" />
+        </div>
+
+        {/* Cabecera */}
+        <header className="login-header">
+          <h1 className="login-title">
+            Plan Lector <span className="login-title-accent">AI</span>
           </h1>
-          <p style={{color: '#94a3b8', fontSize: '0.9rem'}}>Asistente virtual con voz propia</p>
+          <p className="login-subtitle">Tu asistente inteligente de lectura</p>
         </header>
-        
-        <div className="login-body" style={{marginBottom: '2.5rem'}}>
-          <p style={{fontSize: '0.95rem', lineHeight: 1.6, color: '#f8fafc', marginBottom: '2rem'}}>
-            Descubre el universo de tus libros favoritos con nuestra inteligencia artificial personalizada.
-          </p>
-          
-          <div style={{display: 'flex', justifyContent: 'center', background: 'white', padding: '0.5rem', borderRadius: '0.75rem'}}>
+
+        {/* Features */}
+        <div className="login-features">
+          <div className="login-feature">
+            <div className="login-feature-icon">
+              <Brain size={18} />
+            </div>
+            <span>IA entrenada con los libros del Plan Lector</span>
+          </div>
+          <div className="login-feature">
+            <div className="login-feature-icon">
+              <BookOpen size={18} />
+            </div>
+            <span>Respuestas personalizadas sobre cada lectura</span>
+          </div>
+          <div className="login-feature">
+            <div className="login-feature-icon">
+              <Users size={18} />
+            </div>
+            <span>Acceso exclusivo para alumnos del IES Comercio</span>
+          </div>
+        </div>
+
+        {/* Botón Google */}
+        <div className="login-google-wrapper">
+          <p className="login-cta">Inicia sesión para continuar</p>
+          <div className="login-google-btn">
             <GoogleLogin
-              onSuccess={(credentialResponse) => {
-                onLoginSuccess(credentialResponse);
-              }}
+              onSuccess={onLoginSuccess}
               onError={() => alert("Error al conectar con Google")}
               useOneTap
+              shape="pill"
+              size="large"
+              text="signin_with"
+              logo_alignment="center"
             />
           </div>
         </div>
-        
-        <footer style={{borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '1.5rem'}}>
-          <div style={{display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', color: '#64748b', fontSize: '0.75rem'}}>
-            <Sparkles size={14} />
-            <span>Fomentando la lectura activa</span>
-          </div>
+
+        {/* Footer */}
+        <footer className="login-footer">
+          <Sparkles size={13} />
+          <span>Fomentando la lectura activa · IES Comercio Logroño</span>
         </footer>
       </div>
     </div>
