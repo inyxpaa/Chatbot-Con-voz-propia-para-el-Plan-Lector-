@@ -1,1 +1,1 @@
-# Paquete modelo — filtro de contenido inapropiado
+# Package modelo

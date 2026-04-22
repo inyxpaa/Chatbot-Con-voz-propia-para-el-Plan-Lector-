@@ -44,3 +44,47 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+
+  deploy:
+    name: Deploy to EC2
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v0.1.10
+        with:
+          host: ${{ secrets.EC2_HOST_BACKEND }}
+          username: ${{ secrets.EC2_USERNAME }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            # Ensure Docker is installed and running
+            if ! command -v docker &> /dev/null; then
+              curl -fsSL https://get.docker.com -o get-docker.sh
+              sudo sh get-docker.sh
+              sudo usermod -aG docker ubuntu
+              sudo systemctl enable docker
+              sudo systemctl start docker
+            fi
+            
+            # Free up space before pulling large AI images
+            sudo docker system prune -f
+            
+            # Pull the latest image
+            sudo docker pull ${{ secrets.DOCKERHUB_USERNAME }}/planlector-backend:latest
+            
+            # Stop and remove existing container if it exists
+            sudo docker stop backend-app || true
+            sudo docker rm backend-app || true
+            
+            # Run the new container with restart policy and necessary environment variables
+            sudo docker run -d \
+              --name backend-app \
+              --restart always \
+              -p 8000:8000 \
+              -v /home/ubuntu/data:/app/data \
+              -v ~/.cache:/root/.cache \
+              -e CHROMA_DB_PATH=/app/datalake/datalake/artifacts/chroma_db \
+              -e DATABASE_URL=${{ secrets.DATABASE_URL }} \
+              -e MONGODB_URL=${{ secrets.MONGODB_URL }} \
+              -e HF_TOKEN=${{ secrets.HF_TOKEN }} \
+              ${{ secrets.DOCKERHUB_USERNAME }}/planlector-backend:latest

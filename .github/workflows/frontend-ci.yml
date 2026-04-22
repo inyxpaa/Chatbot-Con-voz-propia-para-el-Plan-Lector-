@@ -43,12 +43,28 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           envs: BACKEND_PRIVATE_IP
           script: |
+            # Ensure Docker is installed and running
             if ! command -v docker &> /dev/null; then
               curl -fsSL https://get.docker.com -o get-docker.sh
               sudo sh get-docker.sh
               sudo usermod -aG docker ubuntu
+              sudo systemctl enable docker
+              sudo systemctl start docker
             fi
+            
+            # Free up space
+            sudo docker system prune -f
+            
+            # Pull latest frontend image
             sudo docker pull ${{ secrets.DOCKERHUB_USERNAME }}/plan-lector-frontend:latest
+            
+            # Restart container with reliability flags
             sudo docker stop frontend-app || true
             sudo docker rm frontend-app || true
-            sudo docker run -d --name frontend-app -e BACKEND_INTERNAL_IP=$BACKEND_PRIVATE_IP -p 80:80 ${{ secrets.DOCKERHUB_USERNAME }}/plan-lector-frontend:latest
+            
+            sudo docker run -d \
+              --name frontend-app \
+              --restart always \
+              -e BACKEND_INTERNAL_IP=$BACKEND_PRIVATE_IP \
+              -p 80:80 \
+              ${{ secrets.DOCKERHUB_USERNAME }}/plan-lector-frontend:latest

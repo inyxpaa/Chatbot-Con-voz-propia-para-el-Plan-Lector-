@@ -4,15 +4,14 @@ sqlalchemy
 pydantic
 chromadb
 requests
-httpx
 beautifulsoup4
 psycopg2-binary
 pymongo
 google-auth
 python-jose[cryptography]
 python-multipart
-# Inferencia local del modelo fine-tuneado Qwen2.5-QLoRA
-transformers>=4.40.0
-peft>=0.10.0
-accelerate>=0.27.0
-torch --index-url https://download.pytorch.org/whl/cpu
+torch
+transformers
+peft
+accelerate
+psutil

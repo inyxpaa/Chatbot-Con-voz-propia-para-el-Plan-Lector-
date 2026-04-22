@@ -1,247 +1,235 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Routes, Route, Navigate, useNavigate } from "react-router-dom";
-import {
-  LogOut, Shield, MessageSquare, Send, Moon, Sun,
-  Settings, Plus, Trash2, X, Loader2,
-} from "lucide-react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { Routes, Route, Navigate, useNavigate, Link } from "react-router-dom";
+import { LogOut, Shield, MessageSquare, Loader2, Trash2, Settings, Moon, Sun, Languages, Send } from "lucide-react";
 import LoginPage from "./LoginPage";
 import AdminPanel from "./AdminPanel";
 import translations from "./translations";
 
-// ─── Constantes ────────────────────────────────────────────────────
-const STORAGE_TOKEN   = "google_auth_token";
-const STORAGE_USER    = "google_auth_user";
-const STORAGE_THEME   = "chatbot_theme";
-const STORAGE_LANG    = "chatbot_lang";
-const SESSION_KEY     = "chat_session_id";
+const CLAVE_STORAGE_SESION = "chat_session_id";
+const CLAVE_STORAGE_TOKEN = "google_auth_token";
+const CLAVE_STORAGE_USER = "google_auth_user";
+const CLAVE_STORAGE_THEME = "chat_theme";
+const CLAVE_STORAGE_LANG = "chat_language";
 
-// ─── Helpers ───────────────────────────────────────────────────────
-function newSessionId() {
-  return crypto.randomUUID?.() || Math.random().toString(36).substring(2);
+// --- Helpers ---
+function asegurarIdSesion() {
+  let idSesion = sessionStorage.getItem(CLAVE_STORAGE_SESION);
+  if (idSesion) return idSesion;
+  idSesion = crypto.randomUUID?.() || Math.random().toString(36).substring(2);
+  sessionStorage.setItem(CLAVE_STORAGE_SESION, idSesion);
+  return idSesion;
 }
 
 function urlEndpoint(path = "/chat") {
-  const base = import.meta.env.VITE_BACKEND_URL || window.location.origin;
-  return `${base.replace(/\/$/, "")}${path}`;
+  const apiBase = import.meta.env.VITE_BACKEND_URL || window.location.origin;
+  return `${apiBase.replace(/\/$/, "")}${path}`;
 }
 
-function hora(d = new Date()) {
-  return new Intl.DateTimeFormat("es-ES", { hour: "2-digit", minute: "2-digit" }).format(d);
+function formatearHora(d = new Date(), lang = "es") {
+  return new Intl.DateTimeFormat(lang === "es" ? "es-ES" : "en-US", { hour: "2-digit", minute: "2-digit" }).format(d);
 }
 
-// ─── Componente Chat ───────────────────────────────────────────────
-const Chat = ({ token, user, onLogout, language, setLanguage, theme, setTheme, isWidget = false, onClose }) => {
-  const t = translations[language] || translations.es;
-
-  const [sessionId, setSessionId]   = useState(() => sessionStorage.getItem(SESSION_KEY) || newSessionId());
-  const [ocupado, setOcupado]       = useState(false);
-  const [entrada, setEntrada]       = useState("");
+// --- Componente Chat Principal ---
+const Chat = ({ token, user, onLogout, language, setLanguage, theme, setTheme }) => {
+  const [idSesion, setIdSesion] = useState(asegurarIdSesion());
+  const [ocupado, setOcupado] = useState(false);
+  const [entrada, setEntrada] = useState("");
+  const [sesiones, setSesiones] = useState([]);
+  const [mensajes, setMensajes] = useState([]);
   const [showSettings, setShowSettings] = useState(false);
-  const [sessions, setSessions]     = useState([]);
-  const [mensajes, setMensajes]     = useState([
-    {
-      id: "bot-start",
-      role: "bot",
-      text: t.welcome.replace("{{name}}", user.name.split(" ")[0]),
-      fuentes: [],
-      isError: false,
-      time: hora(),
-    },
-  ]);
 
   const listaRef = useRef(null);
   const navigate = useNavigate();
+  const t = translations[language];
 
-  // guarda session id en sessionStorage
+  // Cargar sesiones al inicio
   useEffect(() => {
-    sessionStorage.setItem(SESSION_KEY, sessionId);
-  }, [sessionId]);
+    fetchSesiones();
+    cargarHistorial(idSesion);
+  }, []);
 
-  // scroll to bottom
-  useEffect(() => {
-    if (listaRef.current) listaRef.current.scrollTop = listaRef.current.scrollHeight;
-  }, [mensajes]);
-
-  // carga historial de sesiones
-  const fetchSessions = useCallback(async () => {
+  const fetchSesiones = async () => {
     try {
-      const r = await fetch(urlEndpoint("/chat/sessions"), {
-        headers: { Authorization: `Bearer ${token}` },
+      const resp = await fetch(urlEndpoint("/chat/sessions"), {
+        headers: { "Authorization": `Bearer ${token}` }
       });
-      if (r.ok) setSessions(await r.json());
-    } catch (_) {}
-  }, [token]);
-
-  useEffect(() => { fetchSessions(); }, [fetchSessions]);
-
-  // nueva sesión
-  const handleNewChat = () => {
-    const id = newSessionId();
-    setSessionId(id);
-    setMensajes([{
-      id: "bot-new",
-      role: "bot",
-      text: t.new_conv,
-      fuentes: [],
-      isError: false,
-      time: hora(),
-    }]);
-    fetchSessions();
+      if (resp.ok) {
+        const data = await resp.json();
+        setSesiones(data);
+      }
+    } catch (e) { console.error("Error fetching sessions", e); }
   };
 
-  // cargar sesión existente
-  const handleLoadSession = async (sid) => {
+  const cargarHistorial = async (sid) => {
+    if (!sid) return;
+    setOcupado(true);
     try {
-      const r = await fetch(urlEndpoint(`/chat/history/${sid}`), {
-        headers: { Authorization: `Bearer ${token}` },
+      const resp = await fetch(urlEndpoint(`/chat/history/${sid}`), {
+        headers: { "Authorization": `Bearer ${token}` }
       });
-      if (!r.ok) return;
-      const data = await r.json();
-      setSessionId(sid);
-      setMensajes(data.map(d => ([
-        { id: `${d.id}-u`, role: "user",  text: d.pregunta,  time: hora(new Date(d.creada_en)) },
-        { id: `${d.id}-b`, role: "bot",   text: d.respuesta, time: hora(new Date(d.creada_en)) },
-      ])).flat());
-    } catch (_) {}
+      if (resp.ok) {
+        const data = await resp.json();
+        const msgMapeados = data.map(m => ([
+          { id: m.id + "-q", role: "user", text: m.pregunta, time: formatearHora(new Date(m.creada_en), language) },
+          { id: m.id + "-a", role: "bot", text: m.respuesta, fuentes: JSON.parse(m.fuentes || "[]"), time: formatearHora(new Date(m.creada_en), language) }
+        ])).flat();
+        
+        if (msgMapeados.length === 0) {
+          setMensajes([{
+            id: "welcome", role: "bot", text: t.welcome.replace("{{name}}", user.name.split(' ')[0]), time: formatearHora(new Date(), language)
+          }]);
+        } else {
+          setMensajes(msgMapeados);
+        }
+      }
+    } catch (e) { console.error("Error loading history", e); }
+    finally { setOcupado(false); }
   };
 
-  // borrar sesión
-  const handleDeleteSession = async (e, sid) => {
+  const borrarSesion = async (sid, e) => {
     e.stopPropagation();
     if (!window.confirm(t.confirm_delete)) return;
-    await fetch(urlEndpoint(`/chat/session/${sid}`), {
-      method: "DELETE",
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    fetchSessions();
-    if (sid === sessionId) handleNewChat();
+    try {
+      const resp = await fetch(urlEndpoint(`/chat/session/${sid}`), {
+        method: 'DELETE',
+        headers: { "Authorization": `Bearer ${token}` }
+      });
+      if (resp.ok) {
+        if (sid === idSesion) {
+          nuevoChat();
+        }
+        fetchSesiones();
+      }
+    } catch (e) { console.error("Error deleting session", e); }
   };
 
-  // enviar mensaje
+  const nuevoChat = () => {
+    const nuevoId = crypto.randomUUID?.() || Math.random().toString(36).substring(2);
+    sessionStorage.setItem(CLAVE_STORAGE_SESION, nuevoId);
+    setIdSesion(nuevoId);
+    setMensajes([{
+      id: "welcome-" + Date.now(), role: "bot", text: t.new_conv, time: formatearHora(new Date(), language)
+    }]);
+  };
+
+  const seleccionarSesion = (sid) => {
+    setIdSesion(sid);
+    sessionStorage.setItem(CLAVE_STORAGE_SESION, sid);
+    cargarHistorial(sid);
+  };
+
+  useEffect(() => {
+    if (listaRef.current) {
+      listaRef.current.scrollTop = listaRef.current.scrollHeight;
+    }
+  }, [mensajes]);
+
   const enviarMensaje = async (texto) => {
     const textoLimpio = texto.trim();
     if (!textoLimpio) return;
-    setMensajes(prev => [...prev, { id: Date.now() + "-u", role: "user", text: textoLimpio, time: hora() }]);
+
+    setMensajes((prev) => [...prev, { id: Date.now() + "-u", role: "user", text: textoLimpio, time: formatearHora(new Date(), language) }]);
     setOcupado(true);
     setEntrada("");
+
     try {
       const resp = await fetch(urlEndpoint("/chat"), {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ mensaje: textoLimpio, session_id: sessionId, idioma: language }),
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+        body: JSON.stringify({ mensaje: textoLimpio, session_id: idSesion, idioma: language }),
       });
-      if (!resp.ok) throw new Error();
+
+      if (!resp.ok) throw new Error("Error en el servidor.");
       const data = await resp.json();
-      setMensajes(prev => [...prev, {
-        id: Date.now() + "-b", role: "bot",
-        text: data.respuesta, fuentes: data.fuentes || [], time: hora(),
-      }]);
-      fetchSessions();
-    } catch {
-      setMensajes(prev => [...prev, {
-        id: Date.now() + "-e", role: "bot",
-        text: t.error_conn, isError: true, time: hora(),
-      }]);
-    } finally {
-      setOcupado(false);
-    }
+      setMensajes((prev) => [...prev, { id: Date.now() + "-b", role: "bot", text: data.respuesta, fuentes: data.fuentes || [], time: formatearHora(new Date(), language) }]);
+      fetchSesiones(); // Actualizar lista lateral
+    } catch (e) {
+      setMensajes((prev) => [...prev, { id: Date.now() + "-e", role: "bot", text: t.error_conn, isError: true, time: formatearHora(new Date(), language) }]);
+    } finally { setOcupado(false); }
   };
 
-  const isAdmin = user?.email ? true : false; // controlled by backend ADMIN_EMAILS
+  const isAdmin = [
+    "gsoriano@iescomercio.com", 
+    "lentejasricas@gmail.com", 
+    "dcastillaa@gmail.com",
+    "test@example.com"
+  ].includes(user.email);
 
   return (
-    <main className="chatbot-app" data-theme={theme}>
-      {/* ── Sidebar de sesiones ─────────────────────────────── */}
-      <aside className="sidebar" role="navigation" aria-label={t.user_sessions}>
+    <main className="chatbot-app">
+      <aside className="sidebar">
         <div className="sidebar-header">
-          <button className="new-chat-btn" onClick={handleNewChat} aria-label={t.new_chat}>
-            <Plus size={16} aria-hidden="true" /> {t.new_chat}
-          </button>
+           <button className="new-chat-btn" onClick={nuevoChat}>
+             <MessageSquare size={18} /> {t.new_chat}
+           </button>
         </div>
-
-        <div className="history-list" role="list">
-          {sessions.length === 0 && (
-            <p style={{ padding: "1rem", color: "var(--text-muted)", fontSize: "0.85rem" }}>{t.no_sessions}</p>
-          )}
-          {sessions.map(s => (
-            <div
-              key={s.session_id}
-              role="listitem"
-              className={`history-item ${s.session_id === sessionId ? "active" : ""}`}
-              onClick={() => handleLoadSession(s.session_id)}
-              tabIndex={0}
-              onKeyDown={e => e.key === "Enter" && handleLoadSession(s.session_id)}
-            >
-              <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                {s.titulo}
-              </span>
-              <button
-                className="delete-btn"
-                onClick={e => handleDeleteSession(e, s.session_id)}
-                aria-label={t.delete_chat}
-              >
-                <Trash2 size={14} aria-hidden="true" />
-              </button>
-            </div>
-          ))}
+        <div className="history-list">
+           <p style={{padding: '0.5rem', fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700}}>{t.recent}</p>
+           {sesiones.length === 0 && <p style={{padding: '1rem', fontSize: '0.8rem', color: 'var(--text-muted)'}}>{t.no_sessions}</p>}
+           {sesiones.map(s => (
+             <div 
+               key={s.session_id} 
+               className={`history-item ${idSesion === s.session_id ? 'active' : ''}`}
+               onClick={() => seleccionarSesion(s.session_id)}
+             >
+               <div style={{display: 'flex', alignItems: 'center', gap: '0.75rem', overflow: 'hidden'}}>
+                 <MessageSquare size={14} />
+                 <span style={{overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'}}>
+                   {s.titulo || t.session_title}
+                 </span>
+               </div>
+               <button className="delete-btn" onClick={(e) => borrarSesion(s.session_id, e)}>
+                 <Trash2 size={14} />
+               </button>
+             </div>
+           ))}
         </div>
-
         <div className="sidebar-footer">
-          <div className="user-info-mini">
-            {user.picture && <img src={user.picture} alt="" className="user-avatar-mini" referrerPolicy="no-referrer" />}
-            <div style={{ overflow: "hidden" }}>
-              <p style={{ fontSize: "0.85rem", fontWeight: 700, margin: 0, overflow: "hidden", textOverflow: "ellipsis" }}>{user.name}</p>
-              <p style={{ fontSize: "0.75rem", color: "var(--text-muted)", margin: 0 }}>{user.email}</p>
-            </div>
-          </div>
+           <div className="user-info-mini" style={{display: 'flex', alignItems: 'center', gap: '0.8rem'}}>
+              <img src={user.picture} alt="" style={{width: 38, height: 38, borderRadius: '50%', border: '2px solid var(--primary)'}} referrerPolicy="no-referrer" />
+              <div style={{overflow: 'hidden'}}>
+                <p style={{fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-main)', overflow: 'hidden', textOverflow: 'ellipsis'}}>{user.name}</p>
+                <p style={{fontSize: '0.75rem', color: 'var(--text-muted)'}}>{user.email}</p>
+              </div>
+           </div>
         </div>
       </aside>
 
-      {/* ── Chat principal ──────────────────────────────────── */}
       <section className="chatbot-container">
         <header className="chatbot-header">
           <h1 className="chatbot-title">Plan Lector AI</h1>
           <div className="header-actions">
-            <button onClick={() => setShowSettings(!showSettings)} className="icon-btn" title={t.settings} aria-label={t.settings}>
-              <Settings size={20} aria-hidden="true" />
+            <button onClick={() => setShowSettings(!showSettings)} className="icon-btn" title={t.settings}>
+              <Settings size={20} />
             </button>
-            <button
-              onClick={() => navigate("/admin")}
-              className="icon-btn"
-              title={t.admin_panel}
-              aria-label={t.admin_link}
-            >
-              <Shield size={20} aria-hidden="true" />
-            </button>
-            <button onClick={onLogout} className="icon-btn" title={t.logout} aria-label={t.logout}>
-              <LogOut size={20} aria-hidden="true" />
-            </button>
-            {isWidget && onClose && (
-              <button onClick={onClose} className="icon-btn" aria-label={t.close_chat}>
-                <X size={20} aria-hidden="true" />
+            {isAdmin && (
+              <button onClick={() => navigate("/admin")} className="icon-btn" title={t.admin_panel}>
+                <Shield size={20} />
               </button>
             )}
+            <button onClick={onLogout} className="icon-btn" title={t.logout}>
+              <LogOut size={20} />
+            </button>
           </div>
         </header>
 
-        {/* Menú de ajustes */}
         {showSettings && (
-          <div className="settings-menu" role="dialog" aria-label={t.settings}>
+          <div className="settings-menu">
             <div className="settings-group">
               <span className="settings-label">{t.language}</span>
               <div className="toggle-group">
-                <button className={`toggle-btn ${language === "es" ? "active" : ""}`} onClick={() => setLanguage("es")}>ES</button>
-                <button className={`toggle-btn ${language === "en" ? "active" : ""}`} onClick={() => setLanguage("en")}>EN</button>
+                <button className={`toggle-btn ${language === 'es' ? 'active' : ''}`} onClick={() => setLanguage('es')}>ES</button>
+                <button className={`toggle-btn ${language === 'en' ? 'active' : ''}`} onClick={() => setLanguage('en')}>EN</button>
               </div>
             </div>
             <div className="settings-group">
               <span className="settings-label">{t.theme}</span>
               <div className="toggle-group">
-                <button className={`toggle-btn ${theme === "dark"  ? "active" : ""}`} onClick={() => setTheme("dark")}>
-                  <Moon size={14} aria-hidden="true" /> {t.dark}
+                <button className={`toggle-btn ${theme === 'dark' ? 'active' : ''}`} onClick={() => setTheme('dark')}>
+                  <Moon size={14} /> {t.dark}
                 </button>
-                <button className={`toggle-btn ${theme === "light" ? "active" : ""}`} onClick={() => setTheme("light")}>
-                  <Sun  size={14} aria-hidden="true" /> {t.light}
+                <button className={`toggle-btn ${theme === 'light' ? 'active' : ''}`} onClick={() => setTheme('light')}>
+                  <Sun size={14} /> {t.light}
                 </button>
               </div>
             </div>
@@ -249,49 +237,40 @@ const Chat = ({ token, user, onLogout, language, setLanguage, theme, setTheme, i
           </div>
         )}
 
-        {/* Mensajes */}
-        <section
-          ref={listaRef}
-          className="chatbot-messages"
-          aria-live="polite"
-          aria-label="Conversación con el asistente"
-          role="log"
-        >
-          {mensajes.map(m => (
+        <section ref={listaRef} className="chatbot-messages">
+          {mensajes.map((m) => (
             <div key={m.id} className={`chatbot-message chatbot-message--${m.role}`}>
               <div className="chatbot-bubble">
-                <p className={`chatbot-bubble__text${m.isError ? " chatbot-error" : ""}`}>{m.text}</p>
+                <p className={`chatbot-bubble__text${m.isError ? " chatbot-error" : ""}`}>
+                  {m.text}
+                </p>
                 <div className="chatbot-bubble__meta">
                   <span className="chatbot-time">{m.time}</span>
                   {m.role === "bot" && m.fuentes?.length > 0 && (
-                    <span className="chatbot-sources">Ref: {m.fuentes[0]}</span>
+                    <span className="chatbot-sources">
+                      Info: {m.fuentes[0]}
+                    </span>
                   )}
                 </div>
               </div>
             </div>
           ))}
-          {ocupado && <div className="typing-indicator" aria-live="polite">{t.thinking}</div>}
+           {ocupado && <div className="typing-indicator">{t.thinking}</div>}
         </section>
 
-        {/* Input */}
-        <form
-          className="chatbot-form"
-          onSubmit={e => { e.preventDefault(); enviarMensaje(entrada); }}
-          autoComplete="off"
-        >
+        <form className="chatbot-form" onSubmit={(e) => { e.preventDefault(); enviarMensaje(entrada); }} autoComplete="off">
           <div className="chatbot-inputRow">
-            <input
+             <input
               className="chatbot-input"
               type="text"
               placeholder={t.placeholder}
               required
               value={entrada}
-              onChange={e => setEntrada(e.target.value)}
+              onChange={(e) => setEntrada(e.target.value)}
               disabled={ocupado}
-              aria-label={t.placeholder}
             />
-            <button className="chatbot-send" type="submit" disabled={ocupado} aria-label={t.send}>
-              <Send size={18} aria-hidden="true" />
+            <button className="chatbot-send" type="submit" disabled={ocupado}>
+              <Send size={20} />
             </button>
           </div>
         </form>
@@ -300,115 +279,70 @@ const Chat = ({ token, user, onLogout, language, setLanguage, theme, setTheme, i
   );
 };
 
-// ─── App Principal — Modo widget flotante + standalone ──────────────
+// --- App Principal con Rutas ---
 export default function App() {
-  const [token, setToken]       = useState(localStorage.getItem(STORAGE_TOKEN));
-  const [user,  setUser]        = useState(JSON.parse(localStorage.getItem(STORAGE_USER)  || "null"));
-  const [theme, setTheme]       = useState(localStorage.getItem(STORAGE_THEME) || "light");
-  const [language, setLanguage] = useState(localStorage.getItem(STORAGE_LANG)  || "es");
-  const [isOpen, setIsOpen]     = useState(false); // modo widget: ¿está abierto?
+  const [token, setToken] = useState(localStorage.getItem(CLAVE_STORAGE_TOKEN));
+  const [user, setUser] = useState(JSON.parse(localStorage.getItem(CLAVE_STORAGE_USER) || "null"));
+  const [theme, setTheme] = useState(localStorage.getItem(CLAVE_STORAGE_THEME) || "dark");
+  const [language, setLanguage] = useState(localStorage.getItem(CLAVE_STORAGE_LANG) || "es");
 
-  const t = translations[language] || translations.es;
-
-  // persiste preferencias
   useEffect(() => {
-    document.documentElement.setAttribute("data-theme", theme);
-    localStorage.setItem(STORAGE_THEME, theme);
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem(CLAVE_STORAGE_THEME, theme);
   }, [theme]);
 
-  useEffect(() => { localStorage.setItem(STORAGE_LANG, language); }, [language]);
+  useEffect(() => {
+    localStorage.setItem(CLAVE_STORAGE_LANG, language);
+  }, [language]);
 
-  const handleLoginSuccess = response => {
-    const jwt = response.credential;
-    setToken(jwt);
-    localStorage.setItem(STORAGE_TOKEN, jwt);
+  const handleLoginSuccess = (response) => {
+    const jwtToken = response.credential;
+    setToken(jwtToken);
+    localStorage.setItem(CLAVE_STORAGE_TOKEN, jwtToken);
+    
     try {
-      const payload = JSON.parse(atob(jwt.split(".")[1]));
-      const u = { email: payload.email, name: payload.name, picture: payload.picture };
-      setUser(u);
-      localStorage.setItem(STORAGE_USER, JSON.stringify(u));
-    } catch (e) { console.error("Token decode error", e); }
+      const base64Url = jwtToken.split(".")[1];
+      const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
+      const jsonPayload = decodeURIComponent(
+        atob(base64)
+          .split("")
+          .map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
+          .join("")
+      );
+      const payload = JSON.parse(jsonPayload);
+      const userData = { email: payload.email, name: payload.name, picture: payload.picture };
+      setUser(userData);
+      localStorage.setItem(CLAVE_STORAGE_USER, JSON.stringify(userData));
+    } catch (e) {
+      console.error("Error decoding token", e);
+    }
+
   };
 
   const handleLogout = () => {
-    setToken(null); setUser(null);
-    localStorage.removeItem(STORAGE_TOKEN);
-    localStorage.removeItem(STORAGE_USER);
-    setIsOpen(false);
+    setToken(null);
+    setUser(null);
+    localStorage.removeItem(CLAVE_STORAGE_TOKEN);
+    localStorage.removeItem(CLAVE_STORAGE_USER);
   };
 
-  // ── Detección de modo: es widget (WordPress iframe) o app standalone
-  // Si la URL tiene el parámetro ?widget=true o el documento NO es el top-level,
-  // se activa el modo widget flotante automáticamente.
-  const isWidgetMode = useMemo(() => {
-    try {
-      return (
-        window.self !== window.top                          // dentro de iframe
-        || new URLSearchParams(window.location.search).get("widget") === "true"
-      );
-    } catch {
-      return true; // si falla cross-origin, es iframe
-    }
-  }, []);
-
-  const chatProps = { token, user, onLogout: handleLogout, language, setLanguage, theme, setTheme };
-
-  // ═══════════════════════════════════════
-  //  MODO STANDALONE (app normal en AWS)
-  // ═══════════════════════════════════════
-  if (!isWidgetMode) {
-    if (!token || !user) return <LoginPage onLoginSuccess={handleLoginSuccess} />;
-    return (
-      <div data-theme={theme}>
-        <Routes>
-          <Route path="/"      element={<Chat {...chatProps} />} />
-          <Route path="/admin" element={<AdminPanel token={token} user={user} />} />
-          <Route path="*"      element={<Navigate to="/" />} />
-        </Routes>
-      </div>
-    );
+  if (!token) {
+    return <LoginPage onLoginSuccess={handleLoginSuccess} />;
   }
 
-  // ═══════════════════════════════════════
-  //  MODO WIDGET FLOTANTE (WordPress)
-  // ═══════════════════════════════════════
-
-  // Botón flotante — chat cerrado
-  if (!isOpen) {
-    return (
-      <button
-        className="chatbot-launcher-btn"
-        onClick={() => setIsOpen(true)}
-        aria-label={t.open_chat}
-        title={t.open_chat}
-      >
-        <MessageSquare size={28} aria-hidden="true" />
-      </button>
-    );
-  }
-
-  // Burbuja widget — chat abierto
   return (
-    <div className="chatbot-widget-container" data-theme={theme}>
-      {/* Login dentro del widget */}
-      {!token || !user ? (
-        <LoginPage onLoginSuccess={handleLoginSuccess} />
-      ) : (
-        <Routes>
-          <Route
-            path="/"
-            element={
-              <Chat
-                {...chatProps}
-                isWidget={true}
-                onClose={() => setIsOpen(false)}
-              />
-            }
-          />
-          <Route path="/admin" element={<AdminPanel token={token} user={user} />} />
-          <Route path="*"      element={<Navigate to="/" />} />
-        </Routes>
-      )}
-    </div>
+    <Routes>
+      <Route path="/" element={<Chat 
+        token={token} 
+        user={user} 
+        onLogout={handleLogout} 
+        language={language}
+        setLanguage={setLanguage}
+        theme={theme}
+        setTheme={setTheme}
+      />} />
+      <Route path="/admin" element={<AdminPanel token={token} user={user} />} />
+      <Route path="*" element={<Navigate to="/" />} />
+    </Routes>
   );
 }
