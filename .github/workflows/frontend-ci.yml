@@ -67,4 +67,6 @@ jobs:
               --restart always \
               -e BACKEND_INTERNAL_IP=$BACKEND_PRIVATE_IP \
               -p 80:80 \
+              -p 443:443 \
+              -v /etc/letsencrypt:/etc/letsencrypt:ro \
               ${{ secrets.DOCKERHUB_USERNAME }}/plan-lector-frontend:latest
