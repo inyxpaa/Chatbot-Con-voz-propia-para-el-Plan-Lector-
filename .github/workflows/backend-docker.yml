@@ -87,4 +87,5 @@ jobs:
               -e DATABASE_URL=${{ secrets.DATABASE_URL }} \
               -e MONGODB_URL=${{ secrets.MONGODB_URL }} \
               -e HF_TOKEN=${{ secrets.HF_TOKEN }} \
+              -e OLLAMA_URL=http://172.17.0.1:11434/api/generate \
               ${{ secrets.DOCKERHUB_USERNAME }}/planlector-backend:latest

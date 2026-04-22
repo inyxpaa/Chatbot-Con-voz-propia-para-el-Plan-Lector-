@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Routes, Route, Navigate, useNavigate, Link } from "react-router-dom";
-import { LogOut, Shield, MessageSquare, Loader2, Trash2, Settings, Moon, Sun, Languages, Send } from "lucide-react";
+import { LogOut, Shield, MessageSquare, Loader2, Trash2, Settings, Moon, Sun, Languages, Send, Menu, X } from "lucide-react";
 import LoginPage from "./LoginPage";
 import AdminPanel from "./AdminPanel";
 import translations from "./translations";
@@ -37,6 +37,7 @@ const Chat = ({ token, user, onLogout, language, setLanguage, theme, setTheme })
   const [sesiones, setSesiones] = useState([]);
   const [mensajes, setMensajes] = useState([]);
   const [showSettings, setShowSettings] = useState(false);
+  const [showSidebar, setShowSidebar] = useState(false);
 
   const listaRef = useRef(null);
   const navigate = useNavigate();
@@ -116,6 +117,7 @@ const Chat = ({ token, user, onLogout, language, setLanguage, theme, setTheme })
     setIdSesion(sid);
     sessionStorage.setItem(CLAVE_STORAGE_SESION, sid);
     cargarHistorial(sid);
+    setShowSidebar(false); // Cerrar en móvil al seleccionar
   };
 
   useEffect(() => {
@@ -140,9 +142,51 @@ const Chat = ({ token, user, onLogout, language, setLanguage, theme, setTheme })
       });
 
       if (!resp.ok) throw new Error("Error en el servidor.");
-      const data = await resp.json();
-      setMensajes((prev) => [...prev, { id: Date.now() + "-b", role: "bot", text: data.respuesta, fuentes: data.fuentes || [], time: formatearHora(new Date(), language) }]);
-      fetchSesiones(); // Actualizar lista lateral
+      
+      // Manejo de respuestas JSON (Ej: Bloqueos por toxicidad)
+      const contentType = resp.headers.get("content-type");
+      if (contentType && contentType.includes("application/json")) {
+        const data = await resp.json();
+        setMensajes((prev) => [...prev, { id: Date.now() + "-b", role: "bot", text: data.respuesta, fuentes: data.fuentes || [], time: formatearHora(new Date(), language) }]);
+        fetchSesiones();
+        return;
+      }
+
+      // Manejo de Streaming (SSE)
+      const idBot = Date.now() + "-b";
+      setMensajes((prev) => [...prev, { id: idBot, role: "bot", text: "", fuentes: [], time: formatearHora(new Date(), language) }]);
+      
+      const reader = resp.body.getReader();
+      const decoder = new TextDecoder("utf-8");
+      let botText = "";
+      let buffer = "";
+      
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        
+        buffer += decoder.decode(value, { stream: true });
+        const parts = buffer.split("\n\n");
+        buffer = parts.pop(); // Keep the incomplete part in the buffer
+        
+        for (const part of parts) {
+            if (part.startsWith("data: ")) {
+                try {
+                    const data = JSON.parse(part.substring(6));
+                    if (data.chunk) {
+                        botText += data.chunk;
+                        setMensajes(prev => prev.map(m => m.id === idBot ? { ...m, text: botText } : m));
+                    }
+                    if (data.done) {
+                        setMensajes(prev => prev.map(m => m.id === idBot ? { ...m, fuentes: data.fuentes } : m));
+                        fetchSesiones();
+                    }
+                } catch (e) {
+                    console.error("Error parsing chunk", e);
+                }
+            }
+        }
+      }
     } catch (e) {
       setMensajes((prev) => [...prev, { id: Date.now() + "-e", role: "bot", text: t.error_conn, isError: true, time: formatearHora(new Date(), language) }]);
     } finally { setOcupado(false); }
@@ -156,8 +200,9 @@ const Chat = ({ token, user, onLogout, language, setLanguage, theme, setTheme })
   ].includes(user.email);
 
   return (
-    <main className="chatbot-app">
-      <aside className="sidebar">
+    <main className={`chatbot-app ${showSidebar ? "sidebar-open" : ""}`}>
+      {showSidebar && <div className="sidebar-overlay" onClick={() => setShowSidebar(false)} />}
+      <aside className={`sidebar ${showSidebar ? "active" : ""}`}>
         <div className="sidebar-header">
            <button className="new-chat-btn" onClick={nuevoChat}>
              <MessageSquare size={18} /> {t.new_chat}
@@ -197,7 +242,12 @@ const Chat = ({ token, user, onLogout, language, setLanguage, theme, setTheme })
 
       <section className="chatbot-container">
         <header className="chatbot-header">
-          <h1 className="chatbot-title">LIA</h1>
+          <div style={{display: 'flex', alignItems: 'center', gap: '1rem'}}>
+            <button className="mobile-toggle" onClick={() => setShowSidebar(!showSidebar)}>
+              {showSidebar ? <X size={24} /> : <Menu size={24} />}
+            </button>
+            <h1 className="chatbot-title">LIA</h1>
+          </div>
 
           <div className="header-actions">
             <button onClick={() => setShowSettings(!showSettings)} className="icon-btn" title={t.settings}>

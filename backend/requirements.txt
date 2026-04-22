@@ -10,8 +10,5 @@ pymongo
 google-auth
 python-jose[cryptography]
 python-multipart
-torch
-transformers
-peft
-accelerate
+
 psutil

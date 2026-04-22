@@ -1,6 +1,22 @@
 server {
     listen 80;
-    server_name localhost;
+    server_name buscador-ia.com www.buscador-ia.com localhost;
+
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}
+
+server {
+    listen 443 ssl;
+    server_name buscador-ia.com www.buscador-ia.com;
+
+    ssl_certificate /etc/letsencrypt/live/buscador-ia.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/buscador-ia.com/privkey.pem;
+
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_prefer_server_ciphers on;
+    ssl_ciphers HIGH:!aNULL:!MD5;
 
     location / {
         root /usr/share/nginx/html;
