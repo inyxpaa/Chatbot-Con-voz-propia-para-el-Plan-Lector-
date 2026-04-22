@@ -28,11 +28,26 @@ jobs:
           push: true
           tags: ${{ secrets.DOCKERHUB_USERNAME }}/plan-lector-frontend:latest
       - name: Fetch Backend Private IP
+        id: fetch-ip
         run: |
           echo "${{ secrets.EC2_SSH_KEY }}" > private_key.pem
           chmod 600 private_key.pem
-          PRIVATE_IP=$(ssh -o StrictHostKeyChecking=no -i private_key.pem ${{ secrets.EC2_USERNAME }}@${{ secrets.EC2_HOST_BACKEND }} "hostname -I | awk '{print \$1}'")
+          
+          echo "Checking connectivity to Backend: ${{ secrets.EC2_HOST_BACKEND }}..."
+          if ! nc -zv -w 5 ${{ secrets.EC2_HOST_BACKEND }} 22; then
+            echo "::error::No se puede conectar al Backend (Puerto 22 cerrado o IP incorrecta). ¿Están encendidas las máquinas?"
+            exit 1
+          fi
+
+          PRIVATE_IP=$(ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 -i private_key.pem ${{ secrets.EC2_USERNAME }}@${{ secrets.EC2_HOST_BACKEND }} "hostname -I | awk '{print \$1}'")
+          
+          if [ -z "$PRIVATE_IP" ]; then
+            echo "::warning::No se pudo obtener la IP privada. Usando localhost como fallback (no recomendado)."
+            PRIVATE_IP="127.0.0.1"
+          fi
+          
           echo "BACKEND_PRIVATE_IP=$PRIVATE_IP" >> $GITHUB_ENV
+          echo "IP obtenida: $PRIVATE_IP"
 
       - name: Deploy to EC2
         uses: appleboy/ssh-action@v0.1.10
@@ -43,6 +58,7 @@ jobs:
           username: ${{ secrets.EC2_USERNAME }}
           key: ${{ secrets.EC2_SSH_KEY }}
           envs: BACKEND_PRIVATE_IP
+          connect_timeout: 30s
           script: |
             # Ensure Docker is installed and running
             if ! command -v docker &> /dev/null; then
