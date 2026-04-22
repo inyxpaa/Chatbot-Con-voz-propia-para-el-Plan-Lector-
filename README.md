@@ -1,65 +1,56 @@
 # Chatbot "Con voz propia" - Plan Lector
 
-![Estado](https://img.shields.io/badge/Estado-Sprint_1_Completado-success)
+![Estado](https://img.shields.io/badge/Estado-Sprint_2_Completado-success)
 ![Versión](https://img.shields.io/badge/Versión-1.0.0-blue)
 ![Licencia](https://img.shields.io/badge/Licencia-MIT-green)
 
-Asistente conversacional inteligente basado en tecnología RAG (Retrieval-Augmented Generation), diseñado para difundir, consultar y dinamizar los contenidos del proyecto lector del IES Comercio.
+![Python](https://img.shields.io/badge/Python-3.10+-blue?logo=python&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white)
+![React](https://img.shields.io/badge/React-20232A?logo=react&logoColor=61DAFB)
+![AWS](https://img.shields.io/badge/AWS-232F3E?logo=amazon-aws&logoColor=white)
 
-Este sistema permite a los estudiantes, profesores y familias realizar consultas en lenguaje natural sobre obras, actividades, reseñas y recomendaciones, obteniendo respuestas basadas única y exclusivamente en la base documental curada y validada por el centro.
+> **Acceso a la aplicación en vivo:** [http://ec2-44-218-99-64.compute-1.amazonaws.com/](http://ec2-44-218-99-64.compute-1.amazonaws.com/)
 
----
-
-## Arquitectura del Sistema
-
-El proyecto sigue una arquitectura desacoplada en distintas capas funcionales:
-
-### 1. Data Lake (Capa de Datos)
-El almacenamiento y procesamiento de la información sigue una estructura estandarizada de Big Data:
-* **raw/ (Fuentes Documentales):** Almacenamiento inmutable de textos originales, reseñas, publicaciones de la web del instituto y materiales didácticos.
-* **processed/ (Ingesta y Preparación):** Textos limpios, normalizados y divididos en fragmentos (chunks) semánticos mediante scripts de Python.
-* **artifacts/ (Indexación Vectorial):** Base de datos vectorial (ChromaDB) que almacena los embeddings generados a partir de los fragmentos, permitiendo búsquedas por similitud matemática.
-
-### 2. Backend (API REST)
-Desarrollado con FastAPI, expone los endpoints necesarios para recibir las consultas, conectar con ChromaDB para recuperar el contexto (RAG) y comunicarse con el modelo de lenguaje (LLM) para generar la respuesta final.
-
-### 3. Frontend (Interfaz Web)
-Interfaz ligera construida con HTML/CSS/JS (React/Vite), diseñada para ser responsive y fácilmente embebible como widget en el WordPress institucional del centro.
+Este proyecto es un asistente conversacional basado en tecnología RAG (Retrieval-Augmented Generation). Facilita la consulta de contenidos del Plan Lector del centro educativo de forma segura. El sistema responde basándose únicamente en la base documental validada.
 
 ---
 
-## Flujo de Trabajo en Git (Branching Strategy)
+## Arquitectura y Estructura
 
-Para garantizar la estabilidad del código, el equipo sigue una estrategia de ramas estricta basada en Git Flow:
+El proyecto está organizado en las siguientes capas principales:
 
-* **master (Main):** Rama de producción. Está protegida mediante reglas de repositorio. Solo acepta código funcional, testado y revisado a través de Pull Requests.
-* **dev (Development):** Rama de integración. Aquí se unen todas las nuevas características antes de pasar a producción. Es el entorno de pruebas principal.
-* **feature-branches (ej. datalake):** Ramas de trabajo efímeras creadas a partir de dev para desarrollar funcionalidades específicas (como la creación del datalake, la integración de IA o el diseño web). Una vez completadas, se fusionan (merge) en dev.
-
----
-
-## Ética, Privacidad y Cumplimiento RGPD
-
-El sistema está diseñado bajo el principio de "Privacidad desde el Diseño", cumpliendo con los requisitos de protección a menores:
-
-1.  **Minimización de Datos:** El sistema no almacena nombres de menores en el corpus ni registra datos personales en los logs de interacción.
-2.  **Clasificación de Corpus:** Los documentos se catalogan en 3 niveles de privacidad:
-    * Nivel A: Producciones de alumnado (requiere consentimiento y anonimización).
-    * Nivel B: Materiales derivados del equipo (reutilizables sin identificación).
-    * Nivel C: Textos institucionales o de dominio público (uso libre).
-3.  **Trazabilidad:** Las respuestas generadas por el asistente priorizan la citación documental para evitar "alucinaciones" de la IA y respetar el juicio docente.
+* **backend/** Contiene la API desarrollada con FastAPI. Gestiona la conexión con la base de datos vectorial ChromaDB y la integración del modelo de lenguaje.
+* **frontend/** Contiene la interfaz de usuario desarrollada con React y Vite. Está diseñada para ser embebible en el WordPress institucional.
+* **datalake/** Almacena los documentos originales (`raw`), los fragmentos procesados (`processed`) y la base de datos vectorial (`artifacts`).
 
 ---
 
-## Instrucciones de Instalación (Entorno Local)
+## Ética y Privacidad (RGPD)
 
-### Prerrequisitos
-* Python 3.10+
-* Git
+El diseño del chatbot sigue principios de privacidad estricta para proteger a los menores:
 
-### Pasos de despliegue
+1. **Minimización:** No almacenamos nombres de usuarios ni datos personales en los registros.
+2. **Clasificación del corpus:** Dividimos los documentos en niveles de acceso. Protegemos las producciones del alumnado.
+3. **Trazabilidad:** El sistema cita la fuente de la información en sus respuestas. Esto evita desinformación y alucinaciones de la IA.
 
-1. Clonar el repositorio:
-   ```bash
-   git clone [https://github.com/inyxpaa/Chatbot-Con-voz-propia-para-el-Plan-Lector-.git](https://github.com/inyxpaa/Chatbot-Con-voz-propia-para-el-Plan-Lector-.git)
-   cd Chatbot-Con-voz-propia-para-el-Plan-Lector-
+---
+
+## Equipo de Desarrollo
+
+Proyecto desarrollado por estudiantes del IES Comercio.
+
+* [![LinkedIn](https://img.shields.io/badge/LinkedIn-Alexander_Gavilanez-0A66C2?logo=linkedin&logoColor=white)](https://www.linkedin.com/in/alexander-gavilanez-castro-037a8927b/)
+* [![LinkedIn](https://img.shields.io/badge/LinkedIn-Iñigo_Del_Mazo-0A66C2?logo=linkedin&logoColor=white)](https://www.linkedin.com/in/iñigo-del-mazo-monreal-514a7a367)
+* [![LinkedIn](https://img.shields.io/badge/LinkedIn-Diego_Castilla-0A66C2?logo=linkedin&logoColor=white)](https://www.linkedin.com/in/diego-castilla-abella-8892a319b/)
+* [![LinkedIn](https://img.shields.io/badge/LinkedIn-Alejandro_Bueno-0A66C2?logo=linkedin&logoColor=white)](https://www.linkedin.com/in/alejandro-bueno-ortiz-419054240/)
+
+---
+
+## Instalación en Local
+
+Sigue estos pasos para ejecutar el proyecto en tu propio equipo:
+
+### 1. Clonar el repositorio
+```bash
+git clone [https://github.com/inyxpaa/Chatbot-Con-voz-propia-para-el-Plan-Lector-.git](https://github.com/inyxpaa/Chatbot-Con-voz-propia-para-el-Plan-Lector-.git)
+cd Chatbot-Con-voz-propia-para-el-Plan-Lector-

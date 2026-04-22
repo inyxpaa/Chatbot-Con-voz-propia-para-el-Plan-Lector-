@@ -197,7 +197,8 @@ const Chat = ({ token, user, onLogout, language, setLanguage, theme, setTheme })
 
       <section className="chatbot-container">
         <header className="chatbot-header">
-          <h1 className="chatbot-title">Plan Lector AI</h1>
+          <h1 className="chatbot-title">LIA</h1>
+
           <div className="header-actions">
             <button onClick={() => setShowSettings(!showSettings)} className="icon-btn" title={t.settings}>
               <Settings size={20} />
@@ -287,7 +288,14 @@ export default function App() {
   const [language, setLanguage] = useState(localStorage.getItem(CLAVE_STORAGE_LANG) || "es");
 
   useEffect(() => {
+    if (token && user && (user.name.includes('Ã') || user.name.includes('Â'))) {
+      handleLoginSuccess({ credential: token });
+    }
+  }, [token, user]);
+
+  useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
+
     localStorage.setItem(CLAVE_STORAGE_THEME, theme);
   }, [theme]);
 
@@ -316,6 +324,7 @@ export default function App() {
     } catch (e) {
       console.error("Error decoding token", e);
     }
+
 
   };
 
