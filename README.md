@@ -8,49 +8,73 @@
 ![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white)
 ![React](https://img.shields.io/badge/React-20232A?logo=react&logoColor=61DAFB)
 ![AWS](https://img.shields.io/badge/AWS-232F3E?logo=amazon-aws&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-2496ED?logo=docker&logoColor=white)
 
-> **Acceso a la aplicación en vivo:** [http://ec2-44-218-99-64.compute-1.amazonaws.com/](http://ec2-44-218-99-64.compute-1.amazonaws.com/)
+> **Acceso a la plataforma oficial:** [https://buscador-ia.com](https://buscador-ia.com)
 
-Este proyecto es un asistente conversacional basado en tecnología RAG (Retrieval-Augmented Generation). Facilita la consulta de contenidos del Plan Lector del centro educativo de forma segura. El sistema responde basándose únicamente en la base documental validada.
-
----
-
-## Arquitectura y Estructura
-
-El proyecto está organizado en las siguientes capas principales:
-
-* **backend/** Contiene la API desarrollada con FastAPI. Gestiona la conexión con la base de datos vectorial ChromaDB y la integración del modelo de lenguaje.
-* **frontend/** Contiene la interfaz de usuario desarrollada con React y Vite. Está diseñada para ser embebible en el WordPress institucional.
-* **datalake/** Almacena los documentos originales (`raw`), los fragmentos procesados (`processed`) y la base de datos vectorial (`artifacts`).
+Este sistema es un asistente conversacional inteligente basado en la arquitectura **RAG (Retrieval-Augmented Generation)**. Su propósito es dinamizar el Plan Lector del centro educativo, permitiendo realizar consultas en lenguaje natural sobre obras, actividades y recomendaciones. La inteligencia del sistema reside en su capacidad para recuperar información de una base documental curada, garantizando respuestas fiables y sin "alucinaciones".
 
 ---
 
-## Ética y Privacidad (RGPD)
+## Características Principales
 
-El diseño del chatbot sigue principios de privacidad estricta para proteger a los menores:
+* **Búsqueda Semántica:** No busca solo por palabras clave, sino por el significado real de las consultas utilizando embeddings vectoriales.
+* **Privacidad Integrada:** Cumplimiento estricto del RGPD mediante anonimización de datos y niveles de acceso documental.
+* **Despliegue de Alto Rendimiento:** Ejecutado sobre infraestructura AWS (instancias m5.large) con contenedores Docker para asegurar escalabilidad y rapidez.
+* **Interfaz Embebible:** Diseñada para integrarse perfectamente como un widget dentro de sitios institucionales como WordPress.
 
-1. **Minimización:** No almacenamos nombres de usuarios ni datos personales en los registros.
-2. **Clasificación del corpus:** Dividimos los documentos en niveles de acceso. Protegemos las producciones del alumnado.
-3. **Trazabilidad:** El sistema cita la fuente de la información en sus respuestas. Esto evita desinformación y alucinaciones de la IA.
+---
+
+## Arquitectura Técnica
+
+El proyecto se divide en capas modulares para facilitar su mantenimiento:
+
+* **Datalake y Pipeline IA:** Procesamiento de textos en carpetas `raw` y `processed`. Generación de índices vectoriales en **ChromaDB** para una recuperación inmediata.
+* **Backend (API):** Servidor robusto en **FastAPI** que gestiona la lógica de recuperación, integración con motores locales de IA (**Ollama**) y moderación de contenido.
+* **Frontend (Web):** Interfaz reactiva en **React + Vite** centrada en la experiencia de usuario y la accesibilidad.
+* **DevOps:** Flujo de integración y despliegue continuo (CI/CD) mediante **GitHub Actions** hacia AWS EC2.
+
+---
+
+## Ética y Seguridad (RGPD)
+
+El compromiso con la seguridad de la comunidad educativa es un pilar fundamental:
+
+1.  **Minimización:** El sistema solo procesa los metadatos necesarios para la analítica, descartando información personal de los usuarios.
+2.  **Protección de Menores:** El corpus documental se clasifica para proteger producciones del alumnado, requiriendo validación antes de ser indexado.
+3.  **Trazabilidad y Citación:** Cada respuesta incluye referencias documentales, permitiendo al usuario verificar el origen de la información.
 
 ---
 
 ## Equipo de Desarrollo
 
-Proyecto desarrollado por estudiantes del IES Comercio.
+Este proyecto es el resultado del trabajo colaborativo de estudiantes del IES Comercio:
 
-* [![LinkedIn](https://img.shields.io/badge/LinkedIn-Alexander_Gavilanez-0A66C2?logo=linkedin&logoColor=white)](https://www.linkedin.com/in/alexander-gavilanez-castro-037a8927b/)
-* [![LinkedIn](https://img.shields.io/badge/LinkedIn-Iñigo_Del_Mazo-0A66C2?logo=linkedin&logoColor=white)](https://www.linkedin.com/in/iñigo-del-mazo-monreal-514a7a367)
-* [![LinkedIn](https://img.shields.io/badge/LinkedIn-Diego_Castilla-0A66C2?logo=linkedin&logoColor=white)](https://www.linkedin.com/in/diego-castilla-abella-8892a319b/)
-* [![LinkedIn](https://img.shields.io/badge/LinkedIn-Alejandro_Bueno-0A66C2?logo=linkedin&logoColor=white)](https://www.linkedin.com/in/alejandro-bueno-ortiz-419054240/)
+* **Alexander Gavilanez Castro** Junior Full Stack Developer. Responsable de la integración de modelos de IA, despliegue en la nube y optimización del motor conversacional.
+    [![LinkedIn](https://img.shields.io/badge/LinkedIn-Perfil-0A66C2?style=flat-square&logo=linkedin)](https://www.linkedin.com/in/alexander-gavilanez-castro-037a8927b/)
+
+* **Iñigo Del Mazo Monreal** Desarrollador de Datos. Especialista en la creación y curación del Datalake, procesos de limpieza de texto y segmentación semántica (chunking).
+    [![LinkedIn](https://img.shields.io/badge/LinkedIn-Perfil-0A66C2?style=flat-square&logo=linkedin)](https://www.linkedin.com/in/iñigo-del-mazo-monreal-514a7a367)
+
+* **Diego Castilla Abella** Backend Developer. Encargado de la arquitectura de la API, gestión de infraestructura cloud en AWS y persistencia de datos.
+    [![LinkedIn](https://img.shields.io/badge/LinkedIn-Perfil-0A66C2?style=flat-square&logo=linkedin)](https://www.linkedin.com/in/diego-castilla-abella-8892a319b/)
+
+* **Alejandro Bueno Ortiz** Frontend Developer. Responsable del diseño de la interfaz de usuario, accesibilidad y la integración del chat como widget embebible.
+    [![LinkedIn](https://img.shields.io/badge/LinkedIn-Perfil-0A66C2?style=flat-square&logo=linkedin)](https://www.linkedin.com/in/alejandro-bueno-ortiz-419054240/)
 
 ---
 
-## Instalación en Local
+## Instalación y Despliegue Local
 
-Sigue estos pasos para ejecutar el proyecto en tu propio equipo:
+1.  **Clonación:** `git clone https://github.com/inyxpaa/Chatbot-Con-voz-propia-para-el-Plan-Lector-.git`
+2.  **Backend:** Acceder a la carpeta `backend`, crear entorno virtual, instalar dependencias (`pip install -r requirements.txt`) y lanzar con `uvicorn main:app`.
+3.  **Frontend:** Acceder a la carpeta `frontend`, instalar paquetes con `npm install` e iniciar con `npm run dev`.
 
-### 1. Clonar el repositorio
-```bash
-git clone [https://github.com/inyxpaa/Chatbot-Con-voz-propia-para-el-Plan-Lector-.git](https://github.com/inyxpaa/Chatbot-Con-voz-propia-para-el-Plan-Lector-.git)
-cd Chatbot-Con-voz-propia-para-el-Plan-Lector-
+---
+
+## Roadmap
+
+- [x] **Sprint 1:** Arquitectura, datalake e ingestión.
+- [x] **Sprint 2:** Backend, integración RAG y despliegue cloud.
+- [ ] **Sprint 3:** Widget para WordPress y optimización de latencia.
+- [ ] **Sprint 4:** Panel de administración, métricas avanzadas y validación final.
