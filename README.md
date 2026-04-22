@@ -35,6 +35,17 @@ El diseño del chatbot sigue principios de privacidad estricta para proteger a l
 
 ---
 
+## Equipo de Desarrollo
+
+Proyecto desarrollado por estudiantes del IES Comercio.
+
+* [![LinkedIn](https://img.shields.io/badge/LinkedIn-Alexander_Gavilanez-0A66C2?logo=linkedin&logoColor=white)](https://www.linkedin.com/in/alexander-gavilanez-castro-037a8927b/)
+* [![LinkedIn](https://img.shields.io/badge/LinkedIn-Iñigo_Del_Mazo-0A66C2?logo=linkedin&logoColor=white)](https://www.linkedin.com/in/iñigo-del-mazo-monreal-514a7a367)
+* [![LinkedIn](https://img.shields.io/badge/LinkedIn-Diego_Castilla-0A66C2?logo=linkedin&logoColor=white)](https://www.linkedin.com/in/diego-castilla-abella-8892a319b/)
+* [![LinkedIn](https://img.shields.io/badge/LinkedIn-Alejandro_Bueno-0A66C2?logo=linkedin&logoColor=white)](https://www.linkedin.com/in/alejandro-bueno-ortiz-419054240/)
+
+---
+
 ## Instalación en Local
 
 Sigue estos pasos para ejecutar el proyecto en tu propio equipo:
