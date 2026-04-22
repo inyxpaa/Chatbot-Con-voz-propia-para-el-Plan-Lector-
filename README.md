@@ -48,19 +48,19 @@ El compromiso con la seguridad de la comunidad educativa es un pilar fundamental
 
 ## Equipo de Desarrollo
 
-Este proyecto es el resultado del trabajo colaborativo de estudiantes del IES Comercio:
+Proyecto desarrollado bajo metodologías ágiles por el equipo de ingeniería de software del IES Comercio:
 
-* **Alexander Gavilanez Castro** Junior Full Stack Developer. Responsable de la integración de modelos de IA, despliegue en la nube y optimización del motor conversacional.
-    [![LinkedIn](https://img.shields.io/badge/LinkedIn-Perfil-0A66C2?style=flat-square&logo=linkedin)](https://www.linkedin.com/in/alexander-gavilanez-castro-037a8927b/)
+* **Iñigo Del Mazo Monreal** (`inyxpaa`) - *Data & AI Developer* Líder de la capa de datos. Responsable del diseño del Data Lake, la extracción documental, limpieza de textos, chunking semántico y la indexación vectorial persistente mediante ChromaDB.  
+  [![LinkedIn](https://img.shields.io/badge/LinkedIn-Perfil-0A66C2?style=flat-square&logo=linkedin)](https://www.linkedin.com/in/iñigo-del-mazo-monreal-514a7a367)
 
-* **Iñigo Del Mazo Monreal** Desarrollador de Datos. Especialista en la creación y curación del Datalake, procesos de limpieza de texto y segmentación semántica (chunking).
-    [![LinkedIn](https://img.shields.io/badge/LinkedIn-Perfil-0A66C2?style=flat-square&logo=linkedin)](https://www.linkedin.com/in/iñigo-del-mazo-monreal-514a7a367)
+* **Alexander Gavilanez Castro** (`xxcastro`) - *Junior Full Stack Developer* Especialista en integración. Encargado del desarrollo del backend (FastAPI), configuración del entorno Docker, despliegue de modelos de lenguaje local (Ollama) y flujos CI/CD.  
+  [![LinkedIn](https://img.shields.io/badge/LinkedIn-Perfil-0A66C2?style=flat-square&logo=linkedin)](https://www.linkedin.com/in/alexander-gavilanez-castro-037a8927b/)
 
-* **Diego Castilla Abella** Backend Developer. Encargado de la arquitectura de la API, gestión de infraestructura cloud en AWS y persistencia de datos.
-    [![LinkedIn](https://img.shields.io/badge/LinkedIn-Perfil-0A66C2?style=flat-square&logo=linkedin)](https://www.linkedin.com/in/diego-castilla-abella-8892a319b/)
+* **Diego Castilla Abella** (`castilla204`) - *Backend & Cloud Operations* Aportación en la arquitectura del servidor, gestión de la infraestructura en la nube (AWS), seguridad, soporte en el backend y persistencia operativa.  
+  [![LinkedIn](https://img.shields.io/badge/LinkedIn-Perfil-0A66C2?style=flat-square&logo=linkedin)](https://www.linkedin.com/in/diego-castilla-abella-8892a319b/)
 
-* **Alejandro Bueno Ortiz** Frontend Developer. Responsable del diseño de la interfaz de usuario, accesibilidad y la integración del chat como widget embebible.
-    [![LinkedIn](https://img.shields.io/badge/LinkedIn-Perfil-0A66C2?style=flat-square&logo=linkedin)](https://www.linkedin.com/in/alejandro-bueno-ortiz-419054240/)
+* **Alejandro Bueno Ortiz** (`Inaross`) - *Frontend Web Developer* Responsable de la interfaz de usuario. Diseño y desarrollo de la arquitectura React/Vite, asegurando la accesibilidad web y la correcta integración del chatbot como widget.  
+  [![LinkedIn](https://img.shields.io/badge/LinkedIn-Perfil-0A66C2?style=flat-square&logo=linkedin)](https://www.linkedin.com/in/alejandro-bueno-ortiz-419054240/)
 
 ---
 
